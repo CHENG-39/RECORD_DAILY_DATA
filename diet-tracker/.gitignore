@@ -1,0 +1,4 @@
+node_modules/
+dist/
+_temp_food_data/
+*.zip

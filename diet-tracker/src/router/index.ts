@@ -21,6 +21,12 @@ const router = createRouter({
       component: () => import('@/views/StatsView.vue'),
       meta: { title: '统计分析' },
     },
+    {
+      path: '/foods',
+      name: 'foods',
+      component: () => import('@/views/FoodsView.vue'),
+      meta: { title: '食物管理' },
+    },
   ],
 })
 
