@@ -416,7 +416,7 @@ const keyMetrics = computed(() => {
     },
   ]
 
-  return items.map(item => {
+  return items.filter(item => item.key !== 'pral' || isKidney).map(item => {
     const { min, max, isUpperLimit } = item.range
     const goalDisplay = isUpperLimit ? `≤${max}` : `${min}-${max}`
     const pct = item.key === 'pral'

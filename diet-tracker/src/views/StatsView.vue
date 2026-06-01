@@ -345,7 +345,7 @@ const avgNutrition = computed(() => {
 
 function barStyle(value: number, goal: number, _type: string) {
   const maxH = Math.max(goal * 1.3, value, 1)
-  const pct = Math.min((value / maxH) * 100, 100)
+  const pct = Math.max(0, Math.min((value / maxH) * 100, 100))
   const over = value > goal
   return {
     height: pct + '%',

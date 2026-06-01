@@ -196,14 +196,16 @@ const summaryItems = computed(() => {
     }
   });
 
-  // PRAL 行（仅肾脏模式）
+  // PRAL 行（仅肾脏模式，目标 ≤0）
   if (isKidney) {
     const pral = selectedDateNutrition.value.totalPRAL
-    const pralStatus = getPRALStatus(pral)
+    const target = 0
     let pralClass = ''; let pralTag = ''; let pralText = ''
-    if (pralStatus.level === '偏碱') { pralClass = ''; pralTag = ''; pralText = '' }
-    else if (pralStatus.level === '偏高') { pralClass = 's-low'; pralTag = 'low'; pralText = '偏高' }
-    else if (pralStatus.level === '过高') { pralClass = 's-danger'; pralTag = 'danger'; pralText = '过高' }
+    if (pral > target) {
+      const pralStatus = getPRALStatus(pral)
+      if (pralStatus.level === '过高') { pralClass = 's-danger'; pralTag = 'danger'; pralText = '过高' }
+      else { pralClass = 's-low'; pralTag = 'low'; pralText = '偏高' }
+    }
     items.push({
       key: 'pral',
       value: pral,
@@ -212,7 +214,7 @@ const summaryItems = computed(() => {
       label: '酸负荷',
       statusClass: pralClass,
       status: pralTag,
-      statusText: pralStatus.level === '偏碱' ? '优' : pralText || pralStatus.level,
+      statusText: pral > target ? pralText : (pral < 0 ? '优' : '正常'),
       extra: undefined,
     })
   }
