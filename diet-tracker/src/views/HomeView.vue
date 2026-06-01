@@ -190,7 +190,7 @@
         >{{ w }}{{ weightQuickUnit }}</span>
       </div>
       <van-field
-        :model-value="MEAL_TYPES[inputMealType]"
+        :model-value="MEAL_TYPES[inputMealType] + (isAutoMeal ? ' · 自动' : '')"
         label="餐次"
         readonly
         is-link
@@ -279,7 +279,7 @@ import { ref, computed, watch } from 'vue'
 import type { FoodRecord, FoodDefinition } from '@/types'
 import { useDietStore } from '@/stores/diet'
 import { MEAL_TYPES, NUTRITION_LABELS, UNIT_LABELS } from '@/constants'
-import { getTodayString, evaluateIntake, formatWeight, getNutrientSafeRanges } from '@/utils'
+import { getTodayString, evaluateIntake, formatWeight, getNutrientSafeRanges, getCurrentMealType } from '@/utils'
 import { calculateNutritionFromDefinition } from '@/constants/nutrition'
 import { getPotassiumRisk, getPhosphorusRisk, FOOD_CATEGORIES } from '@/data/foods'
 import NavBar from '@/components/NavBar.vue'
@@ -425,6 +425,7 @@ const editingRecordId = ref<string | null>(null)
 const inputFood = ref<FoodDefinition | null>(null)
 const inputWeight = ref<number>()
 const inputMealType = ref<FoodRecord['mealType']>('breakfast')
+const isAutoMeal = ref(true)
 const foodSearchText = ref('')
 const activeCategory = ref('')
 
@@ -495,7 +496,8 @@ function openAddDialog(): void {
   editingRecordId.value = null
   inputFood.value = null
   inputWeight.value = undefined
-  inputMealType.value = 'breakfast'
+  inputMealType.value = getCurrentMealType()
+  isAutoMeal.value = true
   foodSearchText.value = ''
   activeCategory.value = ''
   showAddDialog.value = true
@@ -504,6 +506,7 @@ function openAddDialog(): void {
 function openEditDialog(record: FoodRecord): void {
   isEditing.value = true
   editingRecordId.value = record.id
+  isAutoMeal.value = false
   const food = allFoods.find(f => f.id === record.foodType || f.name === record.foodName)
   inputFood.value = food || null
   if (food?.unitWeight && food.unitWeight > 0) {
@@ -525,6 +528,7 @@ function onFoodSelect(food: FoodDefinition): void {
 
 function onMealTypeSelect(item: { value: string }): void {
   inputMealType.value = item.value as FoodRecord['mealType']
+  isAutoMeal.value = false
   showMealPicker.value = false
 }
 

@@ -17,6 +17,15 @@ export function getTodayString(): string {
   return formatDate(new Date())
 }
 
+/** 根据当前时间自动判断餐次 */
+export function getCurrentMealType(): 'breakfast' | 'lunch' | 'dinner' | 'snack' {
+  const hour = dayjs().hour()
+  if (hour >= 5 && hour < 10) return 'breakfast'
+  if (hour >= 10 && hour < 14) return 'lunch'
+  if (hour >= 14 && hour < 20) return 'dinner'
+  return 'snack'
+}
+
 // ========== Nutrition Totals ==========
 
 export function calculateNutritionTotals(records: Array<{
