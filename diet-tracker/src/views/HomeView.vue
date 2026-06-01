@@ -39,6 +39,17 @@
       </div>
 
       <div v-else class="dashboard">
+        <div class="dashboard-header">
+          <span></span>
+          <van-icon
+            v-if="dietStore.userMode === 'kidney'"
+            name="question-o"
+            size="18"
+            color="#bbb"
+            class="glossary-btn"
+            @click="glossaryRef?.open()"
+          />
+        </div>
         <!-- 热量环形图 -->
         <div class="ring-wrap">
           <svg viewBox="0 0 120 120" class="ring-svg">
@@ -263,6 +274,9 @@
                 </div>
                 <span class="food-macros">
                   每100g {{ food.calories }}kcal · 蛋白{{ food.protein }}g · 钾{{ food.potassium }}mg · 磷{{ food.phosphorus }}mg
+                  <span v-if="dietStore.userMode === 'kidney'" class="food-pral" :style="{ color: getPRALStatus(calculatePRAL(food.protein, food.phosphorus, food.potassium)).color }">
+                    · PRAL {{ calculatePRAL(food.protein, food.phosphorus, food.potassium) }}
+                  </span>
                 </span>
               </div>
               <van-icon v-if="inputFood?.id === food.id" name="success" color="#07c160" size="16" />
@@ -277,6 +291,9 @@
 
     <!-- 餐次选择 -->
     <van-action-sheet v-model:show="showMealPicker" :actions="mealTypeActions" cancel-text="取消" @select="onMealTypeSelect" />
+
+    <!-- 术语帮助 -->
+    <GlossarySheet ref="glossaryRef" />
 
     <!-- 体重设置 -->
     <van-dialog v-model:show="showWeightDialog" title="设置体重" show-cancel-button @confirm="saveWeight">
@@ -300,11 +317,12 @@ import { ref, computed, watch } from 'vue'
 import type { FoodRecord, FoodDefinition } from '@/types'
 import { useDietStore } from '@/stores/diet'
 import { MEAL_TYPES, NUTRITION_LABELS, UNIT_LABELS } from '@/constants'
-import { getTodayString, evaluateIntake, formatWeight, getNutrientSafeRanges, getCurrentMealType } from '@/utils'
+import { getTodayString, evaluateIntake, formatWeight, getNutrientSafeRanges, getCurrentMealType, calculatePRAL, getPRALStatus } from '@/utils'
 import { calculateNutritionFromDefinition } from '@/constants/nutrition'
 import { getPotassiumRisk, getPhosphorusRisk, getPtoProteinRatio, getPtoProteinLevel, getPhosphorusBioavailability, FOOD_CATEGORIES } from '@/data/foods'
 import NavBar from '@/components/NavBar.vue'
 import TabBar from '@/components/TabBar.vue'
+import GlossarySheet from '@/components/GlossarySheet.vue'
 import { showToast } from 'vant'
 
 const dietStore = useDietStore()
@@ -392,6 +410,10 @@ const keyMetrics = computed(() => {
       key: 'phosphorus', current: pBio, range: ranges.phosphorus,
       kidneyDetail: isKidney ? { totalP: pTotal, absorptionPct: pAbsorptionPct } : undefined,
     },
+    {
+      key: 'pral',       current: todayNutrition.totalPRAL,
+      range: { min: -999, max: isKidney ? 0 : 15, isUpperLimit: true, unit: 'mEq' },
+    },
   ]
 
   return items.map(item => {
@@ -400,7 +422,13 @@ const keyMetrics = computed(() => {
     const pct = max > 0 ? Math.min((item.current / max) * 100, 100) : 0
     let statusText = '正常'; let color = '#07c160'; let status = 'ok'
 
-    if (isUpperLimit) {
+    if (item.key === 'pral') {
+      const pralStatus = getPRALStatus(item.current)
+      if (pralStatus.level === '偏碱') { statusText = '优'; status = 'ok'; color = '#07c160' }
+      else if (pralStatus.level === '偏高') { statusText = '偏高'; status = 'low'; color = '#ff976a' }
+      else if (pralStatus.level === '过高') { statusText = '过高'; status = 'danger'; color = '#ee0a24' }
+      else { statusText = '正常'; status = 'ok'; color = '#4facfe' }
+    } else if (isUpperLimit) {
       if (item.current > max) { statusText = '超标'; color = '#ee0a24'; status = 'danger' }
     } else {
       if (item.current < min) { statusText = '偏低'; color = '#ff976a'; status = 'low' }
@@ -455,6 +483,7 @@ const showAddDialog = ref(false)
 const showFoodPicker = ref(false)
 const showMealPicker = ref(false)
 const showWeightDialog = ref(false)
+const glossaryRef = ref<InstanceType<typeof GlossarySheet> | null>(null)
 
 const isEditing = ref(false)
 const editingRecordId = ref<string | null>(null)
@@ -652,6 +681,20 @@ function saveWeight(): void {
   margin-bottom: 14px;
   box-shadow: 0 1px 6px rgba(0,0,0,0.04);
 }
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: -8px;
+}
+
+.glossary-btn {
+  padding: 4px;
+  cursor: pointer;
+}
+
+.glossary-btn:active { opacity: 0.6; }
 
 /* 首次使用引导卡 */
 .welcome-card {
@@ -1261,6 +1304,10 @@ function saveWeight(): void {
 .food-macros {
   font-size: 11px;
   color: #aaa;
+}
+
+.food-pral {
+  font-weight: 600;
 }
 
 /* 体重弹窗提示 */

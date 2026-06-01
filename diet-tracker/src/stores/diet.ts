@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import type { FoodRecord, DailyNutrition, NutritionGoals, UserMode, FoodDefinition } from '@/types'
-import { generateId, getTodayString, calculateNutritionTotals, calculateGoalsFromWeight } from '@/utils'
+import { generateId, getTodayString, calculateNutritionTotals, calculateGoalsFromWeight, calculatePRAL } from '@/utils'
 import { DEFAULT_NUTRITION_GOALS } from '@/constants'
 import { BUILT_IN_FOODS, getPhosphorusBioavailability } from '@/data/foods'
 
@@ -57,6 +57,7 @@ export const useDietStore = defineStore('diet', () => {
       totalPotassium: totals.totalPotassium,
       totalPhosphorus: totals.totalPhosphorus,
       totalBioavailablePhosphorus: totals.totalBioavailablePhosphorus,
+      totalPRAL: calculatePRAL(totals.totalProtein, totals.totalPhosphorus, totals.totalPotassium),
       records: todayRecords.value,
     }
   })
@@ -134,6 +135,7 @@ export const useDietStore = defineStore('diet', () => {
       totalPotassium: totals.totalPotassium,
       totalPhosphorus: totals.totalPhosphorus,
       totalBioavailablePhosphorus: totals.totalBioavailablePhosphorus,
+      totalPRAL: calculatePRAL(totals.totalProtein, totals.totalPhosphorus, totals.totalPotassium),
       records: dateRecords,
     }
   }

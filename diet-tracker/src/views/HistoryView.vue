@@ -92,7 +92,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useDietStore } from '@/stores/diet'
-import { formatDate, formatWeight, getNutrientSafeRanges } from '@/utils'
+import { formatDate, formatWeight, getNutrientSafeRanges, getPRALStatus } from '@/utils'
 import { MEAL_TYPES, NUTRITION_LABELS, UNIT_LABELS } from '@/constants'
 import NavBar from '@/components/NavBar.vue'
 import TabBar from '@/components/TabBar.vue'
@@ -154,7 +154,17 @@ const summaryItems = computed(() => {
       ? selectedDateNutrition.value.totalBioavailablePhosphorus
       : selectedDateNutrition.value.totalPhosphorus,
   }
-  return keys.map(k => {
+  const items: Array<{
+    key: string
+    value: number
+    goalDisplay: string
+    unit: string
+    label: string
+    statusClass: string
+    status: string
+    statusText: string
+    extra: string | undefined
+  }> = keys.map(k => {
     const val = valueMap[k]
     const r = ranges[k]
     let statusClass = ''
@@ -184,7 +194,30 @@ const summaryItems = computed(() => {
       statusText,
       extra,
     }
-  })
+  });
+
+  // PRAL 行（仅肾脏模式）
+  if (isKidney) {
+    const pral = selectedDateNutrition.value.totalPRAL
+    const pralStatus = getPRALStatus(pral)
+    let pralClass = ''; let pralTag = ''; let pralText = ''
+    if (pralStatus.level === '偏碱') { pralClass = ''; pralTag = ''; pralText = '' }
+    else if (pralStatus.level === '偏高') { pralClass = 's-low'; pralTag = 'low'; pralText = '偏高' }
+    else if (pralStatus.level === '过高') { pralClass = 's-danger'; pralTag = 'danger'; pralText = '过高' }
+    items.push({
+      key: 'pral',
+      value: pral,
+      goalDisplay: '≤0',
+      unit: 'mEq',
+      label: '酸负荷',
+      statusClass: pralClass,
+      status: pralTag,
+      statusText: pralStatus.level === '偏碱' ? '优' : pralText || pralStatus.level,
+      extra: undefined,
+    })
+  }
+
+  return items
 })
 
 // ========== 按餐次分组 ==========

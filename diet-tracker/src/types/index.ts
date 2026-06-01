@@ -27,6 +27,7 @@ export interface DailyNutrition {
   totalPotassium: number
   totalPhosphorus: number
   totalBioavailablePhosphorus: number
+  totalPRAL: number
   records: FoodRecord[]
 }
 

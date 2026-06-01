@@ -104,6 +104,10 @@
               <span v-if="dietStore.userMode === 'kidney'" class="n-extra">可利用 {{ avgNutrition.bioavailableP }}mg</span>
               <span class="n-label">磷</span>
             </div>
+            <div v-if="dietStore.userMode === 'kidney'" class="n-item">
+              <span class="n-value">{{ avgNutrition.pral }}<small>mEq</small></span>
+              <span class="n-label">酸负荷</span>
+            </div>
           </div>
         </div>
 
@@ -175,6 +179,10 @@
             <span class="summary-label">日均可利用磷</span>
             <span class="summary-value">{{ monthlyAvg.bioavailableP }}mg</span>
           </div>
+          <div v-if="dietStore.userMode === 'kidney'" class="summary-row">
+            <span class="summary-label">日均酸负荷</span>
+            <span class="summary-value">{{ monthlyAvg.pral }} mEq</span>
+          </div>
         </div>
       </div>
 
@@ -191,7 +199,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useDietStore } from '@/stores/diet'
-import { getTodayString, calculateNutritionTotals, exportRecordsAsJSON, getNutrientSafeRanges } from '@/utils'
+import { getTodayString, calculateNutritionTotals, exportRecordsAsJSON, getNutrientSafeRanges, calculatePRAL } from '@/utils'
 import NavBar from '@/components/NavBar.vue'
 import TabBar from '@/components/TabBar.vue'
 import dayjs from 'dayjs'
@@ -213,7 +221,7 @@ const periods = [
 
 // ========== 可切换图表 ==========
 
-type ChartType = 'protein' | 'potassium' | 'phosphorus' | 'bioavailableP'
+type ChartType = 'protein' | 'potassium' | 'phosphorus' | 'bioavailableP' | 'pral'
 const activeChart = ref<ChartType>('protein')
 const chartToggles = computed<{ key: ChartType; label: string }[]>(() => {
   const toggles: { key: ChartType; label: string }[] = [
@@ -223,21 +231,25 @@ const chartToggles = computed<{ key: ChartType; label: string }[]>(() => {
   ]
   if (dietStore.userMode === 'kidney') {
     toggles.push({ key: 'bioavailableP', label: '可利用磷' })
+    toggles.push({ key: 'pral', label: '酸负荷' })
   }
   return toggles
 })
 
 const activeChartLabel = computed(() => {
-  const map = { protein: '蛋白质', potassium: '钾', phosphorus: '总磷', bioavailableP: '可利用磷' }
+  const map: Record<ChartType, string> = { protein: '蛋白质', potassium: '钾', phosphorus: '总磷', bioavailableP: '可利用磷', pral: '酸负荷' }
   return map[activeChart.value]
 })
 
 const activeChartUnit = computed(() => {
-  return activeChart.value === 'protein' ? 'g' : 'mg'
+  if (activeChart.value === 'protein') return 'g'
+  if (activeChart.value === 'pral') return 'mEq'
+  return 'mg'
 })
 
 const activeChartGoal = computed(() => {
   if (activeChart.value === 'bioavailableP') return nutrientRanges.value.phosphorus.max
+  if (activeChart.value === 'pral') return 0
   return nutrientRanges.value[activeChart.value].max
 })
 
@@ -246,6 +258,7 @@ const activeChartGoalDisplay = computed(() => {
     const r = nutrientRanges.value.phosphorus
     return r.isUpperLimit ? `≤${r.max}` : `${r.min}-${r.max}`
   }
+  if (activeChart.value === 'pral') return '≤0'
   const r = nutrientRanges.value[activeChart.value]
   return r.isUpperLimit ? `≤${r.max}` : `${r.min}-${r.max}`
 })
@@ -256,6 +269,9 @@ function activeChartValue(day: {
   totalPhosphorus: number
   totalBioavailablePhosphorus: number
 }): number {
+  if (activeChart.value === 'pral') {
+    return calculatePRAL(day.totalProtein, day.totalPhosphorus, day.totalPotassium)
+  }
   const map = {
     protein: day.totalProtein,
     potassium: day.totalPotassium,
@@ -310,7 +326,7 @@ const minCalories = computed(() =>
 // 日均营养素
 const avgNutrition = computed(() => {
   if (validDays.value.length === 0) {
-    return { protein: 0, fat: 0, carbs: 0, fiber: 0, potassium: 0, phosphorus: 0, bioavailableP: 0 }
+    return { protein: 0, fat: 0, carbs: 0, fiber: 0, potassium: 0, phosphorus: 0, bioavailableP: 0, pral: 0 }
   }
   const n = validDays.value.length
   return {
@@ -321,6 +337,7 @@ const avgNutrition = computed(() => {
     potassium: Math.round(validDays.value.reduce((s, d) => s + d.totalPotassium, 0) / n),
     phosphorus: Math.round(validDays.value.reduce((s, d) => s + d.totalPhosphorus, 0) / n),
     bioavailableP: Math.round(validDays.value.reduce((s, d) => s + d.totalBioavailablePhosphorus, 0) / n),
+    pral: Math.round(validDays.value.reduce((s, d) => s + calculatePRAL(d.totalProtein, d.totalPhosphorus, d.totalPotassium), 0) / n * 10) / 10,
   }
 })
 
@@ -354,7 +371,7 @@ const monthlyValidDays = computed(() => monthlyStats.value.filter((d) => d.total
 
 const monthlyAvg = computed(() => {
   const valid = monthlyStats.value.filter(d => d.totalCalories > 0)
-  if (valid.length === 0) return { calories: 0, protein: 0, potassium: 0, phosphorus: 0, bioavailableP: 0 }
+  if (valid.length === 0) return { calories: 0, protein: 0, potassium: 0, phosphorus: 0, bioavailableP: 0, pral: 0 }
   const n = valid.length
   return {
     calories: Math.round(valid.reduce((s, d) => s + d.totalCalories, 0) / n),
@@ -362,6 +379,7 @@ const monthlyAvg = computed(() => {
     potassium: Math.round(valid.reduce((s, d) => s + d.totalPotassium, 0) / n),
     phosphorus: Math.round(valid.reduce((s, d) => s + d.totalPhosphorus, 0) / n),
     bioavailableP: Math.round(valid.reduce((s, d) => s + d.totalBioavailablePhosphorus, 0) / n),
+    pral: Math.round(valid.reduce((s, d) => s + calculatePRAL(d.totalProtein, d.totalPhosphorus, d.totalPotassium), 0) / n * 10) / 10,
   }
 })
 

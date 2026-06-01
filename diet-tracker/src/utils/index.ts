@@ -180,6 +180,33 @@ export function mealLabel(record: FoodRecord): string {
   return parts.join(' | ')
 }
 
+// ========== PRAL (膳食酸负荷) ==========
+
+/**
+ * 计算膳食酸负荷 PRAL (Potential Renal Acid Load, mEq/d)
+ *
+ * 基于经典 Remer & Manz 公式 (J Am Diet Assoc, 1995):
+ *   PRAL = 0.49 × 蛋白(g) + 0.037 × 磷(mg) − 0.021 × 钾(mg)
+ *
+ * 正值 = 产酸性（肉类/谷物为主）
+ * 负值 = 产碱性（蔬果为主）
+ * CKD 患者肾脏排酸能力下降，PRAL 应尽量维持低值甚至负值。
+ *
+ * 证据：Goraya, Wesson et al. (2024, ASN Kidney Week) 10年RCT —
+ *   将 PRAL 减半可使终末期肾病风险从 51.6% 降至 13.8%。
+ */
+export function calculatePRAL(protein: number, phosphorus: number, potassium: number): number {
+  return Math.round((0.49 * protein + 0.037 * phosphorus - 0.021 * potassium) * 10) / 10
+}
+
+/** PRAL 状态评估 */
+export function getPRALStatus(pral: number): { level: string; color: string } {
+  if (pral < 0)  return { level: '偏碱', color: '#07c160' }
+  if (pral < 15) return { level: '正常', color: '#4facfe' }
+  if (pral < 30) return { level: '偏高', color: '#ff976a' }
+  return { level: '过高', color: '#ee0a24' }
+}
+
 // ========== Weight-based Goal Calculation ==========
 
 /**
