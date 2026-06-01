@@ -7,6 +7,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig({
+  base: '/RECORD_DAILY_DATA/',
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
