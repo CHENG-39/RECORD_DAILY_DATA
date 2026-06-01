@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import type { FoodRecord, DailyNutrition, NutritionGoals, UserMode, FoodDefinition } from '@/types'
 import { generateId, getTodayString, calculateNutritionTotals, calculateGoalsFromWeight } from '@/utils'
 import { DEFAULT_NUTRITION_GOALS } from '@/constants'
-import { BUILT_IN_FOODS } from '@/data/foods'
+import { BUILT_IN_FOODS, getPhosphorusBioavailability } from '@/data/foods'
 
 export const useDietStore = defineStore('diet', () => {
   const records = ref<FoodRecord[]>([])
@@ -11,10 +11,34 @@ export const useDietStore = defineStore('diet', () => {
   const userMode = ref<UserMode>('normal')
   const customFoods = ref<FoodDefinition[]>([])
   const bodyWeight = ref<number | null>(null) // 用户体重 (kg)
+  const _migrated = ref(false)
 
   const allFoods = computed<FoodDefinition[]>(() => {
     return [...BUILT_IN_FOODS, ...customFoods.value]
   })
+
+  /** 迁移旧记录：为缺少 bioavailablePhosphorus 的记录补充该字段 */
+  function migrateOldRecords(): void {
+    if (_migrated.value) return
+    let changed = false
+    const all = allFoods.value
+    for (const r of records.value) {
+      if (r.bioavailablePhosphorus === undefined || r.bioavailablePhosphorus === null) {
+        const food = all.find(f => f.id === r.foodType || f.name === r.foodName)
+        const coeff = food ? getPhosphorusBioavailability(food.category) : 0.40
+        r.bioavailablePhosphorus = Math.round(r.phosphorus * coeff)
+        changed = true
+      }
+    }
+    if (changed) {
+      // 触发响应式更新
+      records.value = [...records.value]
+    }
+    _migrated.value = true
+  }
+
+  // 在 store 创建后立即执行迁移（persist 插件已恢复数据）
+  migrateOldRecords()
 
   const todayRecords = computed(() => {
     const today = getTodayString()
