@@ -2711,3 +2711,55 @@ export function getPhosphorusRisk(p: number): { level: string; color: string; no
   if (p <= 200) return { level: '中磷', color: '#ff976a', note: 'CKD 适量' }
   return { level: '高磷', color: '#ee0a24', note: 'CKD 限量，避免加工食品中的添加磷' }
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// 磷生物利用率 & 磷/蛋白比（基于 KDIGO 2024 + 文献证据）
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * 各食物分类的磷肠道吸收率系数
+ *
+ * 数据来源：
+ *   - Karp et al. (2007): 全麦面包 41%, 猪肉 53%, 奶酪 38%
+ *   - Moe et al. (2011, CJASN): 素食 52%, 肉食 72% 尿磷回收
+ *   - Kalantar-Zadeh et al. (2010, CJASN): 动物 40-60%, 植物 10-30%
+ *   - St-Jules et al. (2017, JRN): 综合 4 个喂养试验的尿磷回收率
+ *
+ * 乳制品低于肉类是因为钙在肠道结合磷形成不溶性磷酸钙排出。
+ */
+const PHOSPHORUS_BIOAVAILABILITY: Record<string, number> = {
+  '肉类水产': 0.60,   // 动物有机磷，Karp 53% / Moe 72%，取中值 0.60
+  '乳制品':   0.50,   // 钙结合效应，Karp 实测奶酪仅 38%
+  '主食':     0.40,   // 谷物植酸中等，Karp 实测全麦面包 41%
+  '豆制品':   0.35,   // 大豆植酸含量高
+  '蔬菜':     0.30,   // 植物源 + 烹饪水流失
+  '水果':     0.30,
+  '坚果种子': 0.30,   // 植酸极高，芝麻实测仅 ~6%，保守用 0.30
+}
+
+/** 获取指定分类的磷生物利用率系数 */
+export function getPhosphorusBioavailability(category: string): number {
+  return PHOSPHORUS_BIOAVAILABILITY[category] ?? 0.40
+}
+
+/**
+ * 磷/蛋白比值 (P/Pro ratio)
+ *
+ * 比值 ≤ 10 mg/g → 绿色「优选」— 摄入蛋白质时磷负担小
+ * 比值 10–15    → 橙色「适量」
+ * 比值 > 15     → 红色「慎选」— 蛋白质达标时磷已超标
+ *
+ * 阈值依据: Noori, Kalantar-Zadeh et al. (2010, CJASN)
+ *   P/Pro ≥ 16 mg/g → 死亡风险 HR = 1.99
+ *   P/Pro ≥ 14 mg/g → HR = 1.80
+ */
+export function getPtoProteinRatio(food: { phosphorus: number; protein: number }): number {
+  if (food.protein <= 0) return 999
+  return Math.round((food.phosphorus / food.protein) * 10) / 10
+}
+
+export function getPtoProteinLevel(ratio: number): { level: string; color: string; note: string } {
+  if (ratio < 10) return { level: '优选', color: '#07c160', note: '低磷高蛋白，CKD 首选' }
+  if (ratio <= 15) return { level: '适量', color: '#ff976a', note: '适量摄入' }
+  return { level: '慎选', color: '#ee0a24', note: '高磷低蛋白，CKD 尽量避开' }
+}

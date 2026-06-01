@@ -44,6 +44,7 @@
               <span class="s-value">
                 {{ item.value }}<small> / {{ item.goalDisplay }} {{ item.unit }}</small>
               </span>
+              <span v-if="item.extra" class="s-extra">{{ item.extra }}</span>
               <span class="s-label">{{ item.label }}</span>
               <span v-if="item.statusText" class="s-status" :class="'tag-' + item.status">{{ item.statusText }}</span>
             </div>
@@ -140,6 +141,7 @@ const nutrientRanges = computed(() => {
 
 const summaryItems = computed(() => {
   const ranges = nutrientRanges.value
+  const isKidney = dietStore.userMode === 'kidney'
   const keys = ['calories', 'protein', 'fat', 'carbs', 'fiber', 'potassium', 'phosphorus'] as const
   const valueMap: Record<string, number> = {
     calories: selectedDateNutrition.value.totalCalories,
@@ -148,7 +150,9 @@ const summaryItems = computed(() => {
     carbs: selectedDateNutrition.value.totalCarbs,
     fiber: selectedDateNutrition.value.totalFiber,
     potassium: selectedDateNutrition.value.totalPotassium,
-    phosphorus: selectedDateNutrition.value.totalPhosphorus,
+    phosphorus: isKidney
+      ? selectedDateNutrition.value.totalBioavailablePhosphorus
+      : selectedDateNutrition.value.totalPhosphorus,
   }
   return keys.map(k => {
     const val = valueMap[k]
@@ -164,6 +168,11 @@ const summaryItems = computed(() => {
       else if (val > r.max) { statusClass = 's-danger'; status = 'danger'; statusText = '超标' }
     }
 
+    const extra = k === 'phosphorus' && isKidney
+      && selectedDateNutrition.value.totalPhosphorus !== selectedDateNutrition.value.totalBioavailablePhosphorus
+      ? `总磷${Math.round(selectedDateNutrition.value.totalPhosphorus)}mg`
+      : undefined
+
     return {
       key: k,
       value: k === 'calories' || k === 'potassium' || k === 'phosphorus' ? Math.round(val) : Number(val.toFixed(1)),
@@ -173,6 +182,7 @@ const summaryItems = computed(() => {
       statusClass,
       status,
       statusText,
+      extra,
     }
   })
 })
@@ -300,6 +310,13 @@ function handleDelete(id: string): void {
   font-size: 11px;
   color: #999;
   margin-top: 4px;
+}
+
+.s-extra {
+  display: block;
+  font-size: 9px;
+  color: #bbb;
+  margin-top: 1px;
 }
 
 .s-status {

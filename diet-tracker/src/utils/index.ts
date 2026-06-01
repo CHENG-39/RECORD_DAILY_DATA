@@ -36,6 +36,7 @@ export function calculateNutritionTotals(records: Array<{
   fiber: number
   potassium: number
   phosphorus: number
+  bioavailablePhosphorus?: number
 }>): {
   totalCalories: number
   totalProtein: number
@@ -44,6 +45,7 @@ export function calculateNutritionTotals(records: Array<{
   totalFiber: number
   totalPotassium: number
   totalPhosphorus: number
+  totalBioavailablePhosphorus: number
 } {
   return records.reduce(
     (acc, r) => ({
@@ -54,6 +56,7 @@ export function calculateNutritionTotals(records: Array<{
       totalFiber: acc.totalFiber + r.fiber,
       totalPotassium: acc.totalPotassium + r.potassium,
       totalPhosphorus: acc.totalPhosphorus + r.phosphorus,
+      totalBioavailablePhosphorus: acc.totalBioavailablePhosphorus + (r.bioavailablePhosphorus ?? r.phosphorus),
     }),
     {
       totalCalories: 0,
@@ -63,6 +66,7 @@ export function calculateNutritionTotals(records: Array<{
       totalFiber: 0,
       totalPotassium: 0,
       totalPhosphorus: 0,
+      totalBioavailablePhosphorus: 0,
     }
   )
 }

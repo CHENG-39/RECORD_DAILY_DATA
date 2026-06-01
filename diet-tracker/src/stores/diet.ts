@@ -32,6 +32,7 @@ export const useDietStore = defineStore('diet', () => {
       totalFiber: totals.totalFiber,
       totalPotassium: totals.totalPotassium,
       totalPhosphorus: totals.totalPhosphorus,
+      totalBioavailablePhosphorus: totals.totalBioavailablePhosphorus,
       records: todayRecords.value,
     }
   })
@@ -108,6 +109,7 @@ export const useDietStore = defineStore('diet', () => {
       totalFiber: totals.totalFiber,
       totalPotassium: totals.totalPotassium,
       totalPhosphorus: totals.totalPhosphorus,
+      totalBioavailablePhosphorus: totals.totalBioavailablePhosphorus,
       records: dateRecords,
     }
   }

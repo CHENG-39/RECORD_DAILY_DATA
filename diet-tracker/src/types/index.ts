@@ -11,7 +11,8 @@ export interface FoodRecord {
   carbs: number          // 碳水化合物（g）
   fiber: number          // 膳食纤维（g）
   potassium: number      // 钾（mg）
-  phosphorus: number     // 磷（mg）
+  phosphorus: number     // 磷（mg）— 总磷
+  bioavailablePhosphorus: number // 生物可利用磷（mg）— 实际进入血液需肾脏过滤的磷
   mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack'
   date: string           // 日期 YYYY-MM-DD
 }
@@ -25,6 +26,7 @@ export interface DailyNutrition {
   totalFiber: number
   totalPotassium: number
   totalPhosphorus: number
+  totalBioavailablePhosphorus: number
   records: FoodRecord[]
 }
 

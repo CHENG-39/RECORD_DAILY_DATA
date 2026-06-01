@@ -81,6 +81,7 @@
               </span>
               <span class="metric-tag" :class="'tag-' + m.status">{{ m.statusText }}</span>
             </div>
+            <div v-if="m.extra" class="metric-extra">{{ m.extra }}</div>
             <div class="metric-bar">
               <div
                 class="metric-fill"
@@ -239,6 +240,9 @@
                   <span class="food-name">{{ food.name }}</span>
                   <span class="risk-dot" :style="{ background: getPotassiumRisk(food.potassium).color }"></span>
                   <span class="risk-dot" :style="{ background: getPhosphorusRisk(food.phosphorus).color }"></span>
+                  <span v-if="food.protein > 0" class="ppro-tag" :style="{ background: getPtoProteinLevel(getPtoProteinRatio(food)).color }">
+                    P/Pro {{ getPtoProteinRatio(food) }}
+                  </span>
                 </div>
                 <span class="food-macros">
                   每100g {{ food.calories }}kcal · 蛋白{{ food.protein }}g · 钾{{ food.potassium }}mg · 磷{{ food.phosphorus }}mg
@@ -281,7 +285,7 @@ import { useDietStore } from '@/stores/diet'
 import { MEAL_TYPES, NUTRITION_LABELS, UNIT_LABELS } from '@/constants'
 import { getTodayString, evaluateIntake, formatWeight, getNutrientSafeRanges, getCurrentMealType } from '@/utils'
 import { calculateNutritionFromDefinition } from '@/constants/nutrition'
-import { getPotassiumRisk, getPhosphorusRisk, FOOD_CATEGORIES } from '@/data/foods'
+import { getPotassiumRisk, getPhosphorusRisk, getPtoProteinRatio, getPtoProteinLevel, getPhosphorusBioavailability, FOOD_CATEGORIES } from '@/data/foods'
 import NavBar from '@/components/NavBar.vue'
 import TabBar from '@/components/TabBar.vue'
 import { showToast } from 'vant'
@@ -352,10 +356,19 @@ const ringOffset = computed(() => {
 
 const keyMetrics = computed(() => {
   const ranges = nutrientRanges.value
+  const isKidney = dietStore.userMode === 'kidney'
+
+  // 肾脏模式：磷用生物可利用磷评估，同时显示总磷参考
+  const pCurrent = isKidney
+    ? Math.round(todayNutrition.totalBioavailablePhosphorus)
+    : Math.round(todayNutrition.totalPhosphorus)
+  const pTotal = Math.round(todayNutrition.totalPhosphorus)
+
   const items = [
     { key: 'protein' as const,    current: Math.round(todayNutrition.totalProtein * 10) / 10, range: ranges.protein },
     { key: 'potassium' as const,  current: Math.round(todayNutrition.totalPotassium),          range: ranges.potassium },
-    { key: 'phosphorus' as const, current: Math.round(todayNutrition.totalPhosphorus),         range: ranges.phosphorus },
+    { key: 'phosphorus' as const, current: pCurrent, range: ranges.phosphorus,
+      extra: isKidney && pTotal !== pCurrent ? `总磷${pTotal}mg` : undefined },
   ]
 
   return items.map(item => {
@@ -540,6 +553,7 @@ function handleBeforeClose(action: string): boolean {
   const actualWeight = getActualWeight()
   if (!actualWeight) { showToast('请选择有效数量'); return false }
   const nutrition = calculateNutritionFromDefinition(inputFood.value, actualWeight)
+  const bioavailability = getPhosphorusBioavailability(inputFood.value.category)
   const recordData = {
     foodType: inputFood.value.id,
     foodName: inputFood.value.name,
@@ -551,6 +565,7 @@ function handleBeforeClose(action: string): boolean {
     fiber: nutrition.fiber,
     potassium: nutrition.potassium,
     phosphorus: nutrition.phosphorus,
+    bioavailablePhosphorus: Math.round(nutrition.phosphorus * bioavailability),
     mealType: inputMealType.value,
     date: getTodayString(),
   }
@@ -795,6 +810,13 @@ function saveWeight(): void {
 .tag-ok     { background: #e8f5e9; color: #07c160; }
 .tag-danger { background: #ffebee; color: #ee0a24; }
 .tag-low    { background: #fff3e0; color: #ff976a; }
+
+.metric-extra {
+  font-size: 10px;
+  color: #aaa;
+  margin-top: 2px;
+  padding-left: 44px;
+}
 
 .metric-bar {
   height: 5px;
@@ -1189,6 +1211,16 @@ function saveWeight(): void {
   font-size: 14px;
   font-weight: 500;
   color: #333;
+}
+
+.ppro-tag {
+  font-size: 9px;
+  font-weight: 600;
+  color: #fff;
+  padding: 1px 6px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 .risk-dot {
