@@ -74,14 +74,31 @@
             class="metric-row"
             :class="m.status"
           >
-            <div class="metric-top">
-              <span class="metric-label">{{ m.label }}</span>
-              <span class="metric-val">
-                {{ m.current }}<small> / {{ m.goalDisplay }} {{ m.unit }}</small>
-              </span>
-              <span class="metric-tag" :class="'tag-' + m.status">{{ m.statusText }}</span>
-            </div>
-            <div v-if="m.extra" class="metric-extra">{{ m.extra }}</div>
+            <!-- 肾脏模式磷：双行布局 -->
+            <template v-if="m.kidneyDetail">
+              <div class="metric-top">
+                <span class="metric-label">{{ m.label }}</span>
+                <div class="metric-val-col">
+                  <span class="metric-val">
+                    过滤 {{ m.current }}<small> / {{ m.goalDisplay }} {{ m.unit }}</small>
+                  </span>
+                  <span class="metric-sub">
+                    摄入 {{ m.kidneyDetail.totalP }}mg · 吸收 ~{{ m.kidneyDetail.absorptionPct }}%
+                  </span>
+                </div>
+                <span class="metric-tag" :class="'tag-' + m.status">{{ m.statusText }}</span>
+              </div>
+            </template>
+            <!-- 普通指标：单行 -->
+            <template v-else>
+              <div class="metric-top">
+                <span class="metric-label">{{ m.label }}</span>
+                <span class="metric-val">
+                  {{ m.current }}<small> / {{ m.goalDisplay }} {{ m.unit }}</small>
+                </span>
+                <span class="metric-tag" :class="'tag-' + m.status">{{ m.statusText }}</span>
+              </div>
+            </template>
             <div class="metric-bar">
               <div
                 class="metric-fill"
@@ -358,17 +375,23 @@ const keyMetrics = computed(() => {
   const ranges = nutrientRanges.value
   const isKidney = dietStore.userMode === 'kidney'
 
-  // 肾脏模式：磷用生物可利用磷评估，同时显示总磷参考
-  const pCurrent = isKidney
-    ? Math.round(todayNutrition.totalBioavailablePhosphorus)
-    : Math.round(todayNutrition.totalPhosphorus)
+  // 肾脏模式：磷用生物可利用磷评估
+  const pBio = Math.round(todayNutrition.totalBioavailablePhosphorus)
   const pTotal = Math.round(todayNutrition.totalPhosphorus)
+  const pAbsorptionPct = pTotal > 0 ? Math.round((pBio / pTotal) * 100) : 0
 
-  const items = [
-    { key: 'protein' as const,    current: Math.round(todayNutrition.totalProtein * 10) / 10, range: ranges.protein },
-    { key: 'potassium' as const,  current: Math.round(todayNutrition.totalPotassium),          range: ranges.potassium },
-    { key: 'phosphorus' as const, current: pCurrent, range: ranges.phosphorus,
-      extra: isKidney && pTotal !== pCurrent ? `总磷${pTotal}mg` : undefined },
+  const items: Array<{
+    key: string
+    current: number
+    range: { min: number; max: number; isUpperLimit: boolean; unit: string }
+    kidneyDetail?: { totalP: number; absorptionPct: number }
+  }> = [
+    { key: 'protein',    current: Math.round(todayNutrition.totalProtein * 10) / 10, range: ranges.protein },
+    { key: 'potassium',  current: Math.round(todayNutrition.totalPotassium),          range: ranges.potassium },
+    {
+      key: 'phosphorus', current: pBio, range: ranges.phosphorus,
+      kidneyDetail: isKidney ? { totalP: pTotal, absorptionPct: pAbsorptionPct } : undefined,
+    },
   ]
 
   return items.map(item => {
@@ -787,7 +810,6 @@ function saveWeight(): void {
 }
 
 .metric-val {
-  flex: 1;
   font-size: 13px;
   font-weight: 600;
   color: #333;
@@ -797,6 +819,19 @@ function saveWeight(): void {
   font-size: 10px;
   font-weight: 400;
   color: #999;
+}
+
+.metric-val-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.metric-sub {
+  font-size: 10px;
+  color: #aaa;
 }
 
 .metric-tag {
@@ -810,13 +845,6 @@ function saveWeight(): void {
 .tag-ok     { background: #e8f5e9; color: #07c160; }
 .tag-danger { background: #ffebee; color: #ee0a24; }
 .tag-low    { background: #fff3e0; color: #ff976a; }
-
-.metric-extra {
-  font-size: 10px;
-  color: #aaa;
-  margin-top: 2px;
-  padding-left: 44px;
-}
 
 .metric-bar {
   height: 5px;
