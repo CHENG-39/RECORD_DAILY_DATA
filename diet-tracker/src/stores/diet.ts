@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import type { FoodRecord, DailyNutrition, NutritionGoals, UserMode, FoodDefinition } from '@/types'
 import { generateId, getTodayString, calculateNutritionTotals, calculateGoalsFromWeight } from '@/utils'
 import { DEFAULT_NUTRITION_GOALS } from '@/constants'
@@ -11,15 +11,15 @@ export const useDietStore = defineStore('diet', () => {
   const userMode = ref<UserMode>('normal')
   const customFoods = ref<FoodDefinition[]>([])
   const bodyWeight = ref<number | null>(null) // 用户体重 (kg)
-  const _migrated = ref(false)
 
   const allFoods = computed<FoodDefinition[]>(() => {
     return [...BUILT_IN_FOODS, ...customFoods.value]
   })
 
   /** 迁移旧记录：为缺少 bioavailablePhosphorus 的记录补充该字段 */
+  let _migrating = false
   function migrateOldRecords(): void {
-    if (_migrated.value) return
+    if (_migrating) return
     let changed = false
     const all = allFoods.value
     for (const r of records.value) {
@@ -31,14 +31,14 @@ export const useDietStore = defineStore('diet', () => {
       }
     }
     if (changed) {
-      // 触发响应式更新
+      _migrating = true
       records.value = [...records.value]
+      _migrating = false
     }
-    _migrated.value = true
   }
 
-  // 在 store 创建后立即执行迁移（persist 插件已恢复数据）
-  migrateOldRecords()
+  // watch 确保 persist 插件恢复数据后才执行迁移
+  watch(records, () => migrateOldRecords(), { immediate: true })
 
   const todayRecords = computed(() => {
     const today = getTodayString()
