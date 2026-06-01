@@ -419,15 +419,22 @@ const keyMetrics = computed(() => {
   return items.map(item => {
     const { min, max, isUpperLimit } = item.range
     const goalDisplay = isUpperLimit ? `≤${max}` : `${min}-${max}`
-    const pct = max > 0 ? Math.min((item.current / max) * 100, 100) : 0
+    const pct = item.key === 'pral'
+      ? Math.min(Math.max((item.current + 5) / 20 * 100, 0), 100)
+      : max > 0 ? Math.min((item.current / max) * 100, 100) : 0
     let statusText = '正常'; let color = '#07c160'; let status = 'ok'
 
     if (item.key === 'pral') {
-      const pralStatus = getPRALStatus(item.current)
-      if (pralStatus.level === '偏碱') { statusText = '优'; status = 'ok'; color = '#07c160' }
-      else if (pralStatus.level === '偏高') { statusText = '偏高'; status = 'low'; color = '#ff976a' }
-      else if (pralStatus.level === '过高') { statusText = '过高'; status = 'danger'; color = '#ee0a24' }
-      else { statusText = '正常'; status = 'ok'; color = '#4facfe' }
+      if (item.current > max) {
+        // 超过目标：根据超出程度分级
+        const pralStatus = getPRALStatus(item.current)
+        if (pralStatus.level === '过高') { statusText = '过高'; status = 'danger'; color = '#ee0a24' }
+        else { statusText = '偏高'; status = 'low'; color = '#ff976a' }
+      } else if (item.current < 0) {
+        statusText = '优'; status = 'ok'; color = '#07c160'
+      } else {
+        statusText = '正常'; status = 'ok'; color = '#4facfe'
+      }
     } else if (isUpperLimit) {
       if (item.current > max) { statusText = '超标'; color = '#ee0a24'; status = 'danger' }
     } else {
