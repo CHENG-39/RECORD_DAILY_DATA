@@ -24,6 +24,7 @@ export const NUTRITION_LABELS: Record<string, string> = {
   fiber: '膳食纤维',
   potassium: '钾',
   phosphorus: '磷',
+  pral: '酸负荷',
 }
 
 export const UNIT_LABELS: Record<string, string> = {
@@ -34,6 +35,7 @@ export const UNIT_LABELS: Record<string, string> = {
   fiber: 'g',
   potassium: 'mg',
   phosphorus: 'mg',
+  pral: 'mEq',
 }
 
 /** 各模式的预设营养目标（取推荐范围中值） */
