@@ -227,6 +227,23 @@ export const BUILT_IN_FOODS: FoodDefinition[] = [
     calories: 96,
     unit: '100g',
   },
+  {
+    // 馒头（白面，蒸制）— 中国食物成分表 第6版，早餐常见份量 ~75g/个
+    id: 'MANTOU',
+    name: '馒头（白面）',
+    category: '主食',
+    isBuiltIn: true,
+    protein: 7.0,
+    fat: 1.1,
+    carbs: 44.2,
+    fiber: 1.3,
+    potassium: 84,
+    phosphorus: 68,
+    sodium: 165,
+    calories: 223,
+    unit: '1个',
+    unitWeight: 75,
+  },
 
   // ═══════════════════════════════════════════════════════════════════════
   // 二、肉类水产 (Meat & Seafood) — 按磷含量从低到高排序
@@ -2673,6 +2690,23 @@ export const BUILT_IN_FOODS: FoodDefinition[] = [
     sodium: 46,
     calories: 61,
     unit: '100g',
+  },
+  {
+    // 欧亚 高原全脂纯牛奶 200ml — 产品包装营养成分表
+    id: 'DAIRY_MILK_OYA',
+    name: '欧亚全脂牛奶',
+    category: '乳制品',
+    isBuiltIn: true,
+    protein: 3.2,
+    fat: 3.5,
+    carbs: 4.8,
+    fiber: 0,
+    potassium: 132,
+    phosphorus: 84,
+    sodium: 55,
+    calories: 63,
+    unit: '100g',
+    displayUnit: 'ml',
   },
 ]
 
