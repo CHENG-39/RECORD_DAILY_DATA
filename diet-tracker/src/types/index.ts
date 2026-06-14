@@ -41,18 +41,6 @@ export interface NutritionGoals {
   phosphorus: number
 }
 
-// ========== 食物类型 ==========
-
-export const FoodType = {
-  RICE: 'RICE',
-  EGG: 'EGG',
-  MEAT_PORK: 'MEAT_PORK',
-  MEAT_CHICKEN: 'MEAT_CHICKEN',
-  MEAT_BEEF: 'MEAT_BEEF',
-} as const
-
-export type FoodType = (typeof FoodType)[keyof typeof FoodType]
-
 // ========== 自定义食物定义 ==========
 
 export interface FoodDefinition {

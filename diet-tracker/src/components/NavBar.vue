@@ -26,7 +26,7 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useDietStore } from '@/stores/diet'
-import { MODE_PRESET_GOALS } from '@/constants'
+import { calculateGoalsFromWeight } from '@/utils'
 
 defineEmits<{ openWeight: [] }>()
 
@@ -39,7 +39,7 @@ function switchMode(mode: 'normal' | 'kidney'): void {
   if (dietStore.bodyWeight) {
     dietStore.setBodyWeight(dietStore.bodyWeight)
   } else {
-    dietStore.updateGoals({ ...MODE_PRESET_GOALS[mode] })
+    dietStore.updateGoals({ ...calculateGoalsFromWeight(70, mode) })
   }
 }
 </script>

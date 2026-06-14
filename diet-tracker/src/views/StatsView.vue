@@ -199,7 +199,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useDietStore } from '@/stores/diet'
-import { getTodayString, calculateNutritionTotals, exportRecordsAsJSON, getNutrientSafeRanges, calculatePRAL } from '@/utils'
+import { getTodayString, calculateNutritionTotals, exportRecordsAsJSON, getNutrientSafeRanges } from '@/utils'
 import NavBar from '@/components/NavBar.vue'
 import TabBar from '@/components/TabBar.vue'
 import dayjs from 'dayjs'
@@ -268,9 +268,10 @@ function activeChartValue(day: {
   totalPotassium: number
   totalPhosphorus: number
   totalBioavailablePhosphorus: number
+  totalPRAL: number
 }): number {
   if (activeChart.value === 'pral') {
-    return calculatePRAL(day.totalProtein, day.totalPhosphorus, day.totalPotassium)
+    return day.totalPRAL
   }
   const map = {
     protein: day.totalProtein,
@@ -337,7 +338,7 @@ const avgNutrition = computed(() => {
     potassium: Math.round(validDays.value.reduce((s, d) => s + d.totalPotassium, 0) / n),
     phosphorus: Math.round(validDays.value.reduce((s, d) => s + d.totalPhosphorus, 0) / n),
     bioavailableP: Math.round(validDays.value.reduce((s, d) => s + d.totalBioavailablePhosphorus, 0) / n),
-    pral: Math.round(validDays.value.reduce((s, d) => s + calculatePRAL(d.totalProtein, d.totalPhosphorus, d.totalPotassium), 0) / n * 10) / 10,
+    pral: Math.round(validDays.value.reduce((s, d) => s + d.totalPRAL, 0) / n * 10) / 10,
   }
 })
 
@@ -379,7 +380,7 @@ const monthlyAvg = computed(() => {
     potassium: Math.round(valid.reduce((s, d) => s + d.totalPotassium, 0) / n),
     phosphorus: Math.round(valid.reduce((s, d) => s + d.totalPhosphorus, 0) / n),
     bioavailableP: Math.round(valid.reduce((s, d) => s + d.totalBioavailablePhosphorus, 0) / n),
-    pral: Math.round(valid.reduce((s, d) => s + calculatePRAL(d.totalProtein, d.totalPhosphorus, d.totalPotassium), 0) / n * 10) / 10,
+    pral: Math.round(valid.reduce((s, d) => s + d.totalPRAL, 0) / n * 10) / 10,
   }
 })
 

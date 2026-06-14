@@ -38,24 +38,4 @@ export const UNIT_LABELS: Record<string, string> = {
   pral: 'mEq',
 }
 
-/** 各模式的预设营养目标（取推荐范围中值） */
-export const MODE_PRESET_GOALS = {
-  normal: {
-    calories: 2200,
-    protein: 62,
-    fat: 55,
-    carbs: 310,
-    fiber: 30,
-    potassium: 4100,
-    phosphorus: 1000,
-  },
-  kidney: {
-    calories: 1800,
-    protein: 42,
-    fat: 50,
-    carbs: 250,
-    fiber: 25,
-    potassium: 2500,
-    phosphorus: 900,
-  },
-} as const
+

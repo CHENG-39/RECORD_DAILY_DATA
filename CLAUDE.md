@@ -47,21 +47,18 @@ State is persisted to localStorage automatically.
 ### Data flow
 
 1. User picks food type + weight + meal type in HomeView dialog
-2. `calculateNutrition()` from `constants/nutrition.ts` looks up per-100g data and scales by weight
+2. `calculateNutritionFromDefinition()` from `constants/nutrition.ts` looks up per-100g data (from `data/foods.ts`) and scales by weight
 3. `addRecord()` pushes a `FoodRecord` into the store
-4. Computed properties in the store aggregate totals via `calculateNutritionTotals()` from `utils/index.ts`
+4. Computed properties in the store aggregate totals via `calculateNutritionTotals()` from `utils/index.ts` (which also computes `totalPRAL` and `totalBioavailablePhosphorus`)
 
-### Two parallel type/util systems
+### Composable pattern
 
-The codebase has **two sets of type/utility abstractions** that are not reconciled:
-
-- **Active (used by views/store)**: `src/types/index.ts` (`FoodRecord`, `DailyNutrition`, `NutritionGoals`) and `src/utils/index.ts` (`calculateNutritionTotals`)
-- **Unused (more elaborate)**: `src/types/diet.ts` (`MealRecord`, `NutritionEvaluation`, `NutritionStatus`, etc.) and `src/utils/nutritionCalculator.ts` (`evaluateIntake`, `calculateDailyNutrition`)
-
-The `diet.ts` types define a richer model with `MealRecord` grouping foods by meal, `NutritionEvaluation` with low/normal/high/danger status, and kidney-friendly mode. None of this is wired to the UI. If adding meal-grouping or nutrition evaluation features, use these existing types rather than creating new ones.
+`src/composables/useDashboardMetrics.ts` — extracts dashboard-related computed properties (calorie ring chart, key metrics with status evaluation, expandable minor metrics) from HomeView. This reduces the view file size and keeps business logic testable in isolation.
 
 ### Food nutrition data
 
-`src/constants/nutrition.ts` — hardcoded per-100g nutrition data for 5 food types (rice, egg, pork, chicken, beef). The `calculateNutrition(foodType, weight)` function scales linearly by ratio.
+`src/data/foods.ts` — built-in food database with 80+ foods across 7 categories (主食/肉类水产/蔬菜/水果/坚果种子/豆制品/乳制品). Each food is a `FoodDefinition` with per-100g nutrition data sourced from USDA FoodData Central. Includes helper functions for phosphorus bioavailability (`getPhosphorusBioavailability`), potassium/phosphorus risk assessment (`getPotassiumRisk`, `getPhosphorusRisk`), and P/Pro ratio (`getPtoProteinRatio`, `getPtoProteinLevel`).
 
-`src/constants/recommended.ts` — daily recommended ranges for `normal` and `kidney` user modes, plus helper functions for status check and coloring.
+`src/constants/nutrition.ts` — provides `calculateNutritionFromDefinition(food, weight)` which scales per-100g data linearly by weight ratio.
+
+`src/constants/recommended.ts` — daily recommended ranges (`RECOMMENDED_NUTRITION`) for `normal` and `kidney` user modes, plus `USER_MODE_CONFIG` for display labels.

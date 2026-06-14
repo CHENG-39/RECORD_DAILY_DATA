@@ -40,51 +40,6 @@ export const RECOMMENDED_NUTRITION: Record<UserMode, NutritionRange> = {
   },
 }
 
-export function getRecommendedRange(mode: UserMode): NutritionRange {
-  return RECOMMENDED_NUTRITION[mode]
-}
-
-export function checkNutritionStatus(
-  value: number,
-  range: { min: number; max: number }
-): 'low' | 'normal' | 'high' {
-  if (value < range.min) return 'low'
-  if (value > range.max) return 'high'
-  return 'normal'
-}
-
-export function getNutritionStatusColor(
-  status: 'low' | 'normal' | 'high' | 'danger'
-): string {
-  switch (status) {
-    case 'low':    return '#ff976a' // 橙色
-    case 'danger':
-    case 'high':   return '#ee0a24' // 红色
-    case 'normal': return '#07c160' // 绿色
-    default:       return '#969799'
-  }
-}
-
-export function getNutritionStatusText(
-  status: 'low' | 'normal' | 'high' | 'danger'
-): string {
-  switch (status) {
-    case 'low':    return '偏低'
-    case 'high':   return '偏高'
-    case 'danger': return '超标'
-    case 'normal': return '正常'
-    default:       return '未知'
-  }
-}
-
-export function calculateNutritionPercentage(
-  value: number,
-  range: { min: number; max: number }
-): number {
-  const mid = (range.min + range.max) / 2
-  return Number(((value / mid) * 100).toFixed(1))
-}
-
 export const USER_MODE_CONFIG: Record<
   UserMode,
   { label: string; description: string }

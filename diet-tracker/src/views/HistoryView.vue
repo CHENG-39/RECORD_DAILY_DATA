@@ -107,11 +107,13 @@ const showCalendar = ref(false)
 const selectedDate = ref(formatDate(new Date()))
 const todayStr = formatDate(new Date())
 
-const quickDateOptions = computed(() => [
-  { label: '今天', value: todayStr },
-  { label: '昨天', value: dayjs(todayStr).subtract(1, 'day').format('YYYY-MM-DD') },
-  { label: '前天', value: dayjs(todayStr).subtract(2, 'day').format('YYYY-MM-DD') },
-])
+	const quickDateOptions = computed(() =>
+	  Array.from({ length: 30 }, (_, i) => {
+	    const date = dayjs(todayStr).subtract(i, 'day').format('YYYY-MM-DD')
+	    const label = i === 0 ? '今天' : i === 1 ? '昨天' : dayjs(date).format('M/D')
+	    return { label, value: date }
+	  })
+	)
 
 function onQuickDate(date: string): void {
   selectedDate.value = date

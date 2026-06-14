@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import type { FoodRecord, DailyNutrition, NutritionGoals, UserMode, FoodDefinition } from '@/types'
-import { generateId, getTodayString, calculateNutritionTotals, calculateGoalsFromWeight, calculatePRAL } from '@/utils'
+import { generateId, getTodayString, calculateNutritionTotals, calculateGoalsFromWeight } from '@/utils'
 import { DEFAULT_NUTRITION_GOALS } from '@/constants'
 import { BUILT_IN_FOODS, getPhosphorusBioavailability } from '@/data/foods'
 
@@ -45,10 +45,9 @@ export const useDietStore = defineStore('diet', () => {
     return records.value.filter((record) => record.date === today)
   })
 
-  const todayNutrition = computed((): DailyNutrition => {
-    const totals = calculateNutritionTotals(todayRecords.value)
+  function buildDailyNutrition(date: string, recs: FoodRecord[], totals: ReturnType<typeof calculateNutritionTotals>): DailyNutrition {
     return {
-      date: getTodayString(),
+      date,
       totalCalories: totals.totalCalories,
       totalProtein: totals.totalProtein,
       totalFat: totals.totalFat,
@@ -57,9 +56,13 @@ export const useDietStore = defineStore('diet', () => {
       totalPotassium: totals.totalPotassium,
       totalPhosphorus: totals.totalPhosphorus,
       totalBioavailablePhosphorus: totals.totalBioavailablePhosphorus,
-      totalPRAL: calculatePRAL(totals.totalProtein, totals.totalPhosphorus, totals.totalPotassium),
-      records: todayRecords.value,
+      totalPRAL: totals.totalPRAL,
+      records: recs,
     }
+  }
+
+  const todayNutrition = computed((): DailyNutrition => {
+    return buildDailyNutrition(getTodayString(), todayRecords.value, calculateNutritionTotals(todayRecords.value))
   })
 
   function addRecord(record: Omit<FoodRecord, 'id'>): void {
@@ -124,20 +127,7 @@ export const useDietStore = defineStore('diet', () => {
 
   function getDailyNutrition(date: string): DailyNutrition {
     const dateRecords = getRecordsByDate(date)
-    const totals = calculateNutritionTotals(dateRecords)
-    return {
-      date,
-      totalCalories: totals.totalCalories,
-      totalProtein: totals.totalProtein,
-      totalFat: totals.totalFat,
-      totalCarbs: totals.totalCarbs,
-      totalFiber: totals.totalFiber,
-      totalPotassium: totals.totalPotassium,
-      totalPhosphorus: totals.totalPhosphorus,
-      totalBioavailablePhosphorus: totals.totalBioavailablePhosphorus,
-      totalPRAL: calculatePRAL(totals.totalProtein, totals.totalPhosphorus, totals.totalPotassium),
-      records: dateRecords,
-    }
+    return buildDailyNutrition(date, dateRecords, calculateNutritionTotals(dateRecords))
   }
 
   return {

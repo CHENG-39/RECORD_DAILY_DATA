@@ -1,7 +1,8 @@
 import dayjs from 'dayjs'
 import type { FoodRecord, DailyNutrition, NutritionStatus, NutritionGoals, FoodDefinition } from '@/types'
 import { RECOMMENDED_NUTRITION } from '@/constants/recommended'
-import { MEAL_TYPES } from '@/constants'
+
+
 
 // ========== ID & Date ==========
 
@@ -46,8 +47,9 @@ export function calculateNutritionTotals(records: Array<{
   totalPotassium: number
   totalPhosphorus: number
   totalBioavailablePhosphorus: number
+  totalPRAL: number
 } {
-  return records.reduce(
+  const totals = records.reduce(
     (acc, r) => ({
       totalCalories: acc.totalCalories + r.calories,
       totalProtein: acc.totalProtein + r.protein,
@@ -69,15 +71,21 @@ export function calculateNutritionTotals(records: Array<{
       totalBioavailablePhosphorus: 0,
     }
   )
+  return {
+    ...totals,
+    totalPRAL: calculatePRAL(totals.totalProtein, totals.totalPhosphorus, totals.totalPotassium),
+  }
 }
 
 // ========== Nutrition Evaluation ==========
 
 export function evaluateIntake(
   nutrition: DailyNutrition,
-  mode: 'normal' | 'kidney' = 'normal'
+  mode: 'normal' | 'kidney' = 'normal',
+  ranges?: Record<string, { min: number; max: number }>
 ): Record<string, NutritionStatus> {
-  const range = RECOMMENDED_NUTRITION[mode]
+  const defaultRange = RECOMMENDED_NUTRITION[mode]
+  const getRange = (key: string) => ranges?.[key] ?? defaultRange[key as keyof typeof defaultRange]
 
   const evaluateSingle = (value: number, min: number, max: number): Omit<NutritionStatus, 'key'> => {
     const safeValue = Math.max(0, value)
@@ -98,50 +106,19 @@ export function evaluateIntake(
     }
   }
 
+  const r = (key: string) => getRange(key)
   return {
-    protein:    { key: 'protein',    ...evaluateSingle(nutrition.totalProtein, range.protein.min, range.protein.max) },
-    fat:        { key: 'fat',        ...evaluateSingle(nutrition.totalFat, range.fat.min, range.fat.max) },
-    carbs:      { key: 'carbs',      ...evaluateSingle(nutrition.totalCarbs, range.carbs.min, range.carbs.max) },
-    fiber:      { key: 'fiber',      ...evaluateSingle(nutrition.totalFiber, range.fiber.min, range.fiber.max) },
-    potassium:  { key: 'potassium',  ...evaluateSingle(nutrition.totalPotassium, range.potassium.min, range.potassium.max) },
-    phosphorus: { key: 'phosphorus', ...evaluateSingle(nutrition.totalPhosphorus, range.phosphorus.min, range.phosphorus.max) },
-    calories:   { key: 'calories',   ...evaluateSingle(nutrition.totalCalories, range.calories.min, range.calories.max) },
+    protein:    { key: 'protein',    ...evaluateSingle(nutrition.totalProtein, r('protein').min, r('protein').max) },
+    fat:        { key: 'fat',        ...evaluateSingle(nutrition.totalFat, r('fat').min, r('fat').max) },
+    carbs:      { key: 'carbs',      ...evaluateSingle(nutrition.totalCarbs, r('carbs').min, r('carbs').max) },
+    fiber:      { key: 'fiber',      ...evaluateSingle(nutrition.totalFiber, r('fiber').min, r('fiber').max) },
+    potassium:  { key: 'potassium',  ...evaluateSingle(nutrition.totalPotassium, r('potassium').min, r('potassium').max) },
+    phosphorus: { key: 'phosphorus', ...evaluateSingle(nutrition.totalPhosphorus, r('phosphorus').min, r('phosphorus').max) },
+    calories:   { key: 'calories',   ...evaluateSingle(nutrition.totalCalories, r('calories').min, r('calories').max) },
   }
 }
 
 // ========== Formatting ==========
-
-export function formatNutritionValue(value: number, type: string): string {
-  if (value == null || value < 0) return '0'
-  return type === 'calories' ? Math.round(value).toString() : value.toFixed(1)
-}
-
-export function isValidNutrition(nutrition: Partial<DailyNutrition>): boolean {
-  if (!nutrition) return false
-  const keys = ['totalCalories', 'totalProtein', 'totalFat', 'totalCarbs', 'totalFiber', 'totalPotassium', 'totalPhosphorus']
-  return keys.every(key => {
-    const value = (nutrition as Record<string, unknown>)[key]
-    return typeof value === 'number' && isFinite(value) && (value as number) >= 0
-  })
-}
-
-// ========== Food Labels ==========
-
-const FOOD_TYPE_NAMES: Record<string, string> = {
-  RICE: '米饭', EGG: '鸡蛋', MEAT_PORK: '猪瘦肉',
-  MEAT_CHICKEN: '鸡胸肉', MEAT_BEEF: '牛肉',
-}
-
-export function getFoodTypeName(foodType: string): string {
-  return FOOD_TYPE_NAMES[foodType] || foodType
-}
-
-export function getMealTypeName(mealType: string): string {
-  const names: Record<string, string> = {
-    breakfast: '早餐', lunch: '午餐', dinner: '晚餐', snack: '加餐',
-  }
-  return names[mealType] || mealType
-}
 
 /**
  * 根据食物的单位类型，将重量（g）格式化为合适的显示文本
@@ -154,30 +131,6 @@ export function formatWeight(weight: number, unit: string, unitWeight?: number, 
   }
   if (displayUnit === 'ml') return `${weight}ml`
   return `${weight}g`
-}
-
-export function getCommonFoodWeight(foodType: string): string {
-  const commonWeights: Record<string, string> = {
-    RICE: '一碗米饭约 150g',
-    EGG: '一个鸡蛋约 50g',
-    MEAT_PORK: '一块猪瘦肉约 100g',
-    MEAT_CHICKEN: '一块鸡胸肉约 150g',
-    MEAT_BEEF: '一块牛肉约 100g',
-  }
-  return commonWeights[foodType] || '请根据实际重量输入'
-}
-
-/** 生成食物记录的描述标签 */
-export function mealLabel(record: FoodRecord): string {
-  const parts = [
-    MEAL_TYPES[record.mealType],
-    `蛋白质${record.protein}g`,
-    `脂肪${record.fat}g`,
-    `碳水${record.carbs}g`,
-    `钾${record.potassium}mg`,
-    `磷${record.phosphorus}mg`,
-  ]
-  return parts.join(' | ')
 }
 
 // ========== PRAL (膳食酸负荷) ==========
@@ -363,16 +316,6 @@ export function getNutrientSafeRanges(
       isUpperLimit: false,
     },
   }
-}
-
-// 保留旧函数以兼容
-export function getProteinSafeRange(
-  weightKg: number,
-  mode: 'normal' | 'kidney'
-): { min: number; max: number; target: number } {
-  const ranges = getNutrientSafeRanges(weightKg, mode)
-  const p = ranges.protein
-  return { min: p.min, max: p.max, target: p.max }
 }
 
 // ========== Data Export ==========
