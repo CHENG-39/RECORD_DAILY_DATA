@@ -263,7 +263,12 @@ function handleDelete(id: string): void {
   display: flex;
   gap: 8px;
   margin-bottom: 10px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
 }
+
+.quick-dates::-webkit-scrollbar { display: none; }
 
 .date-chip {
   padding: 6px 16px;
@@ -274,6 +279,8 @@ function handleDelete(id: string): void {
   border-radius: 20px;
   cursor: pointer;
   transition: all 0.2s;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .date-chip.active {
