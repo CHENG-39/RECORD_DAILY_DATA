@@ -14,6 +14,7 @@ export const DEFAULT_NUTRITION_GOALS = {
   fiber: 30,
   potassium: 4000,
   phosphorus: 1000,
+  sodium: 2000,
 } as const
 
 export const NUTRITION_LABELS: Record<string, string> = {
@@ -24,6 +25,7 @@ export const NUTRITION_LABELS: Record<string, string> = {
   fiber: '膳食纤维',
   potassium: '钾',
   phosphorus: '磷',
+  sodium: '钠',
   pral: '酸负荷',
 }
 
@@ -35,7 +37,7 @@ export const UNIT_LABELS: Record<string, string> = {
   fiber: 'g',
   potassium: 'mg',
   phosphorus: 'mg',
+  sodium: 'mg',
   pral: 'mEq',
 }
-
 

@@ -28,6 +28,7 @@
             <span class="food-card-macros">
               每100g {{ food.calories }}kcal · 蛋白{{ food.protein }}g · 钾{{ food.potassium }}mg · 磷{{ food.phosphorus }}mg
             </span>
+            <span class="food-card-source">{{ getDataSourceLabel(food) }}</span>
           </div>
         </div>
       </div>
@@ -140,6 +141,12 @@ const filteredBuiltIn = computed(() =>
 const filteredCustom = computed(() =>
   customFoodList.value.filter(f => f.name.includes(searchText.value))
 )
+
+function getDataSourceLabel(food: FoodDefinition): string {
+  if (food.dataSource && food.sourceReference) return `来源：${food.dataSource} · ${food.sourceReference}`
+  if (food.isBuiltIn) return '来源：内置参考数据'
+  return '来源：用户录入'
+}
 
 // ========== 添加/编辑食物 ==========
 
@@ -263,6 +270,14 @@ function handleDelete(id: string): void {
 .section-count {
   font-size: 12px;
   color: #999;
+}
+
+.food-card-source {
+  display: block;
+  margin-top: 4px;
+  font-size: 10px;
+  color: #999;
+  line-height: 1.4;
 }
 
 /* 食物卡片列表 */

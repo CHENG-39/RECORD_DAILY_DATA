@@ -7,6 +7,7 @@ export interface NutritionResult {
   fiber: number
   potassium: number
   phosphorus: number
+  sodium: number
   calories: number
 }
 
@@ -20,6 +21,7 @@ export function calculateNutritionFromDefinition(food: FoodDefinition, weight: n
     fiber: Number((food.fiber * ratio).toFixed(1)),
     potassium: Number((food.potassium * ratio).toFixed(1)),
     phosphorus: Number((food.phosphorus * ratio).toFixed(1)),
+    sodium: Number((food.sodium * ratio).toFixed(1)),
     calories: Math.round(food.calories * ratio),
   }
 }

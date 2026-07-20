@@ -27,6 +27,7 @@ export const RECOMMENDED_NUTRITION: Record<UserMode, NutritionRange> = {
     fiber:      { min: 25,  max: 38  },   // WHO ≥25g; US IOM upper 38g for men
     potassium:  { min: 3510, max: 4700 }, // WHO ≥3510mg; US IOM AI 4700mg
     phosphorus: { min: 700,  max: 1250 }, // NIH RDA 700mg; typical upper intake
+    sodium:     { min: 0,    max: 2000 }, // WHO adult sodium upper limit
     calories:   { min: 2000, max: 2500 }, // WHO healthy diet range
   },
   kidney: {
@@ -36,6 +37,7 @@ export const RECOMMENDED_NUTRITION: Record<UserMode, NutritionRange> = {
     fiber:      { min: 20,  max: 30  },   // Slightly reduced for CKD tolerance
     potassium:  { min: 2000, max: 3000 }, // KDIGO 2024 (individualized)
     phosphorus: { min: 800,  max: 1000 }, // KDIGO 2024
+    sodium:     { min: 0,    max: 2000 }, // Must be overridden by an individual clinical plan when applicable
     calories:   { min: 1600, max: 2000 }, // 30-35 kcal/kg × 50-65kg
   },
 }

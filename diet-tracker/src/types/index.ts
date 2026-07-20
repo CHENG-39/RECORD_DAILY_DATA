@@ -12,6 +12,7 @@ export interface FoodRecord {
   fiber: number          // 膳食纤维（g）
   potassium: number      // 钾（mg）
   phosphorus: number     // 磷（mg）— 总磷
+  sodium: number
   bioavailablePhosphorus: number // 生物可利用磷（mg）— 实际进入血液需肾脏过滤的磷
   mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack'
   date: string           // 日期 YYYY-MM-DD
@@ -26,6 +27,7 @@ export interface DailyNutrition {
   totalFiber: number
   totalPotassium: number
   totalPhosphorus: number
+  totalSodium: number
   totalBioavailablePhosphorus: number
   totalPRAL: number
   records: FoodRecord[]
@@ -39,6 +41,7 @@ export interface NutritionGoals {
   fiber: number
   potassium: number
   phosphorus: number
+  sodium: number
 }
 
 // ========== 自定义食物定义 ==========
@@ -59,11 +62,35 @@ export interface FoodDefinition {
   unit: string              // '100g' | '1个'
   unitWeight?: number      // 单件重量（g），如 1个鸡蛋=50g
   displayUnit?: string     // 显示单位，如 'ml' 表示输入时显示容量而非重量
+  dataSource?: string
+  sourceReference?: string
+  dataConfidence?: FoodDataConfidence
 }
+
+export type FoodDataConfidence = 'reference' | 'label' | 'estimate' | 'user'
 
 // ========== 用户模式 ==========
 
 export type UserMode = 'normal' | 'kidney'
+
+export type MealSource = 'home' | 'canteen' | 'takeout' | 'convenience' | 'mixed'
+export type CookingAccess = 'none' | 'limited' | 'kitchen'
+export type LifestylePriority = 'balance' | 'time' | 'budget'
+
+export interface LifestyleProfile {
+  mealSource: MealSource
+  cookingAccess: CookingAccess
+  priority: LifestylePriority
+  configured: boolean
+}
+
+export type SuggestionResponse = 'doable' | 'alternate_requested'
+
+export interface SuggestionFeedback {
+  date: string
+  suggestionKey: string
+  response: SuggestionResponse
+}
 
 // ========== 营养推荐与评估 ==========
 
@@ -74,6 +101,7 @@ export interface NutritionRange {
   fiber: { min: number; max: number }
   potassium: { min: number; max: number }
   phosphorus: { min: number; max: number }
+  sodium: { min: number; max: number }
   calories: { min: number; max: number }
 }
 

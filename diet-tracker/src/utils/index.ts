@@ -37,6 +37,7 @@ export function calculateNutritionTotals(records: Array<{
   fiber: number
   potassium: number
   phosphorus: number
+  sodium?: number
   bioavailablePhosphorus?: number
 }>): {
   totalCalories: number
@@ -46,6 +47,7 @@ export function calculateNutritionTotals(records: Array<{
   totalFiber: number
   totalPotassium: number
   totalPhosphorus: number
+  totalSodium: number
   totalBioavailablePhosphorus: number
   totalPRAL: number
 } {
@@ -58,6 +60,7 @@ export function calculateNutritionTotals(records: Array<{
       totalFiber: acc.totalFiber + r.fiber,
       totalPotassium: acc.totalPotassium + r.potassium,
       totalPhosphorus: acc.totalPhosphorus + r.phosphorus,
+      totalSodium: acc.totalSodium + (r.sodium ?? 0),
       totalBioavailablePhosphorus: acc.totalBioavailablePhosphorus + (r.bioavailablePhosphorus ?? r.phosphorus),
     }),
     {
@@ -68,6 +71,7 @@ export function calculateNutritionTotals(records: Array<{
       totalFiber: 0,
       totalPotassium: 0,
       totalPhosphorus: 0,
+      totalSodium: 0,
       totalBioavailablePhosphorus: 0,
     }
   )
@@ -114,6 +118,7 @@ export function evaluateIntake(
     fiber:      { key: 'fiber',      ...evaluateSingle(nutrition.totalFiber, r('fiber').min, r('fiber').max) },
     potassium:  { key: 'potassium',  ...evaluateSingle(nutrition.totalPotassium, r('potassium').min, r('potassium').max) },
     phosphorus: { key: 'phosphorus', ...evaluateSingle(nutrition.totalPhosphorus, r('phosphorus').min, r('phosphorus').max) },
+    sodium:     { key: 'sodium',     ...evaluateSingle(nutrition.totalSodium, r('sodium').min, r('sodium').max) },
     calories:   { key: 'calories',   ...evaluateSingle(nutrition.totalCalories, r('calories').min, r('calories').max) },
   }
 }
@@ -189,6 +194,7 @@ export function calculateGoalsFromWeight(
       fiber:     Math.round(w * 0.35),          // CKD 适度限制
       potassium: Math.round(w * 35),            // KDIGO: ~2500 mg (70kg → 2450)
       phosphorus: Math.round(w * 12),           // KDIGO: ~840 mg (70kg → 840)
+      sodium: 2000,
     }
   }
 
@@ -201,6 +207,7 @@ export function calculateGoalsFromWeight(
     fiber:     Math.round(w * 0.4),            // ~28g for 70kg
     potassium: Math.round(w * 55),             // WHO: ~3850 mg (70kg)
     phosphorus: Math.round(w * 14),            // RDA: ~980 mg (70kg)
+    sodium: 2000,
   }
 }
 
@@ -275,6 +282,11 @@ export function getNutrientSafeRanges(
         unit: 'mg', label: `≤${Math.round(w * 12)}mg`,
         isUpperLimit: true,
       },
+      sodium: {
+        min: 0, max: 2000,
+        unit: 'mg', label: '≤2000mg',
+        isUpperLimit: true,
+      },
     }
   }
 
@@ -314,6 +326,11 @@ export function getNutrientSafeRanges(
       min: Math.round(w * 10), max: Math.round(w * 18),
       unit: 'mg', label: `${Math.round(w * 10)}–${Math.round(w * 18)}mg`,
       isUpperLimit: false,
+    },
+    sodium: {
+      min: 0, max: 2000,
+      unit: 'mg', label: '≤2000mg',
+      isUpperLimit: true,
     },
   }
 }

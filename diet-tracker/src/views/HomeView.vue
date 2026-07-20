@@ -137,6 +137,33 @@
         </div>
       </div>
 
+      <div class="lifestyle-card" @click="openLifestyleDialog">
+        <div class="lifestyle-icon"><van-icon name="friends-o" size="20" /></div>
+        <div class="lifestyle-copy">
+          <span class="lifestyle-title">用餐情境</span>
+          <span class="lifestyle-desc">{{ lifestyleSummary }}</span>
+        </div>
+        <van-icon name="arrow" size="15" color="#bbb" />
+      </div>
+
+      <div class="next-meal-card">
+        <div class="next-meal-heading">
+          <span>下一餐小建议</span>
+          <span>日常参考</span>
+        </div>
+        <strong>{{ suggestion.title }}</strong>
+        <p>{{ suggestion.action }}</p>
+        <small>{{ suggestion.reason }}</small>
+        <div class="suggestion-actions">
+          <van-button size="small" plain type="primary" @click="markSuggestionDoable">
+            <van-icon name="success" /> 能做到
+          </van-button>
+          <van-button v-if="hasAlternative" size="small" plain @click="requestAlternative">
+            <van-icon name="replay" /> 换一个
+          </van-button>
+        </div>
+      </div>
+
       <!-- ===== 操作按钮 ===== -->
       <div class="actions">
         <van-button type="primary" block round @click="openAddDialog">
@@ -232,6 +259,7 @@
           <span>蛋白质 {{ previewNutrition.protein }}g</span>
           <span>钾 {{ previewNutrition.potassium }}mg</span>
           <span class="highlight">磷 {{ previewNutrition.phosphorus }}mg</span>
+          <span>钠 {{ previewNutrition.sodium }}mg</span>
         </div>
       </div>
     </van-dialog>
@@ -309,18 +337,46 @@
         系统将根据 {{ dietStore.userMode === 'kidney' ? 'KDIGO 2024' : 'WHO/FAO' }} 标准自动计算每日营养推荐值
       </div>
     </van-dialog>
+
+    <van-dialog v-model:show="showLifestyleDialog" title="设置用餐情境" show-cancel-button @confirm="saveLifestyleProfile">
+      <div class="lifestyle-form">
+        <span class="lifestyle-form-label">平时主要在哪里吃</span>
+        <van-radio-group v-model="lifestyleMealSource" direction="horizontal" class="lifestyle-options">
+          <van-radio name="home">家里</van-radio>
+          <van-radio name="canteen">食堂</van-radio>
+          <van-radio name="takeout">外卖</van-radio>
+          <van-radio name="convenience">便利店</van-radio>
+          <van-radio name="mixed">混合</van-radio>
+        </van-radio-group>
+
+        <span class="lifestyle-form-label">烹饪条件</span>
+        <van-radio-group v-model="lifestyleCookingAccess" direction="horizontal" class="lifestyle-options">
+          <van-radio name="none">无法做饭</van-radio>
+          <van-radio name="limited">简单加热</van-radio>
+          <van-radio name="kitchen">有厨房</van-radio>
+        </van-radio-group>
+
+        <span class="lifestyle-form-label">当前最看重</span>
+        <van-radio-group v-model="lifestylePriority" direction="horizontal" class="lifestyle-options">
+          <van-radio name="balance">营养均衡</van-radio>
+          <van-radio name="time">省时间</van-radio>
+          <van-radio name="budget">省钱</van-radio>
+        </van-radio-group>
+      </div>
+    </van-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import type { FoodRecord, FoodDefinition } from '@/types'
+import type { FoodRecord, FoodDefinition, MealSource, CookingAccess, LifestylePriority } from '@/types'
 import { useDietStore } from '@/stores/diet'
 import { MEAL_TYPES } from '@/constants'
 import { getTodayString, formatWeight, getCurrentMealType, calculatePRAL, getPRALStatus } from '@/utils'
 import { calculateNutritionFromDefinition } from '@/constants/nutrition'
 import { getPotassiumRisk, getPhosphorusRisk, getPtoProteinRatio, getPtoProteinLevel, getPhosphorusBioavailability, FOOD_CATEGORIES } from '@/data/foods'
 import { useDashboardMetrics } from '@/composables/useDashboardMetrics'
+import { useNextMealSuggestion } from '@/composables/useNextMealSuggestion'
 import NavBar from '@/components/NavBar.vue'
 import TabBar from '@/components/TabBar.vue'
 import GlossarySheet from '@/components/GlossarySheet.vue'
@@ -362,6 +418,7 @@ const {
   moreMetrics,
   showMoreMetrics,
 } = useDashboardMetrics()
+const { suggestion, hasAlternative, showAlternative } = useNextMealSuggestion()
 
 // ========== 按餐次分组 ==========
 
@@ -383,6 +440,7 @@ const showAddDialog = ref(false)
 const showFoodPicker = ref(false)
 const showMealPicker = ref(false)
 const showWeightDialog = ref(false)
+const showLifestyleDialog = ref(false)
 const glossaryRef = ref<InstanceType<typeof GlossarySheet> | null>(null)
 
 const isEditing = ref(false)
@@ -393,6 +451,21 @@ const inputMealType = ref<FoodRecord['mealType']>('breakfast')
 const isAutoMeal = ref(true)
 const foodSearchText = ref('')
 const activeCategory = ref('')
+
+const lifestyleMealSource = ref<MealSource>(dietStore.lifestyleProfile.mealSource)
+const lifestyleCookingAccess = ref<CookingAccess>(dietStore.lifestyleProfile.cookingAccess)
+const lifestylePriority = ref<LifestylePriority>(dietStore.lifestyleProfile.priority)
+
+const lifestyleSummary = computed(() => {
+  if (!dietStore.lifestyleProfile.configured) return '让建议更贴近你的生活'
+  const mealSourceLabels: Record<MealSource, string> = {
+    home: '家里吃饭', canteen: '学校/单位食堂', takeout: '外卖为主', convenience: '便利店为主', mixed: '多种方式混合',
+  }
+  const priorityLabels: Record<LifestylePriority, string> = {
+    balance: '优先营养均衡', time: '优先省时间', budget: '优先省钱',
+  }
+  return `${mealSourceLabels[dietStore.lifestyleProfile.mealSource]} · ${priorityLabels[dietStore.lifestyleProfile.priority]}`
+})
 
 const isCountFood = computed(() => inputFood.value?.unit === '1个')
 const isLiquidFood = computed(() => inputFood.value?.displayUnit === 'ml')
@@ -517,6 +590,7 @@ function handleBeforeClose(action: string): boolean {
     fiber: nutrition.fiber,
     potassium: nutrition.potassium,
     phosphorus: nutrition.phosphorus,
+    sodium: nutrition.sodium,
     bioavailablePhosphorus: Math.round(nutrition.phosphorus * bioavailability),
     mealType: inputMealType.value,
     date: getTodayString(),
@@ -533,6 +607,41 @@ function handleBeforeClose(action: string): boolean {
 }
 
 function handleDelete(id: string): void { deleteRecord(id) }
+
+function markSuggestionDoable(): void {
+  dietStore.recordSuggestionFeedback({
+    date: getTodayString(),
+    suggestionKey: suggestion.value.key,
+    response: 'doable',
+  })
+  showToast({ message: '已记下这一步，完成后回来记录就好', icon: 'success', duration: 1400 })
+}
+
+function requestAlternative(): void {
+  dietStore.recordSuggestionFeedback({
+    date: getTodayString(),
+    suggestionKey: suggestion.value.key,
+    response: 'alternate_requested',
+  })
+  showAlternative()
+}
+
+function openLifestyleDialog(): void {
+  const profile = dietStore.lifestyleProfile
+  lifestyleMealSource.value = profile.mealSource
+  lifestyleCookingAccess.value = profile.cookingAccess
+  lifestylePriority.value = profile.priority
+  showLifestyleDialog.value = true
+}
+
+function saveLifestyleProfile(): void {
+  dietStore.updateLifestyleProfile({
+    mealSource: lifestyleMealSource.value,
+    cookingAccess: lifestyleCookingAccess.value,
+    priority: lifestylePriority.value,
+  })
+  showToast({ message: '已更新用餐情境', icon: 'success', duration: 1000 })
+}
 
 // ========== 体重弹窗 ==========
 
@@ -632,6 +741,60 @@ function saveWeight(): void {
 .welcome-step:active {
   background: #f8f8f8;
 }
+
+.lifestyle-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  background: #fff;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.lifestyle-card:active { background: #f8f8f8; }
+
+.lifestyle-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  color: #4facfe;
+  background: #e8f4fd;
+  border-radius: 8px;
+}
+
+.lifestyle-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lifestyle-title { font-size: 14px; font-weight: 600; color: #333; }
+.lifestyle-desc { overflow: hidden; color: #999; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+
+.lifestyle-form { padding: 4px 20px 10px; }
+.lifestyle-form-label { display: block; margin: 14px 0 8px; color: #333; font-size: 13px; font-weight: 600; }
+.lifestyle-options { display: flex; flex-wrap: wrap; gap: 10px 14px; }
+
+.next-meal-card {
+  margin-bottom: 14px;
+  padding: 14px;
+  color: #254b42;
+  background: #edf8f2;
+  border: 1px solid #ccebd9;
+  border-radius: 10px;
+}
+
+.next-meal-heading { display: flex; justify-content: space-between; margin-bottom: 8px; color: #45836a; font-size: 11px; }
+.next-meal-card strong { display: block; font-size: 15px; }
+.next-meal-card p { margin: 6px 0; font-size: 13px; line-height: 1.5; }
+.next-meal-card small { display: block; color: #658278; font-size: 11px; line-height: 1.45; }
+.suggestion-actions { display: flex; gap: 8px; margin-top: 12px; }
+.suggestion-actions :deep(.van-button) { min-width: 88px; }
 
 .step-num {
   width: 28px;

@@ -106,7 +106,7 @@ export function useDashboardMetrics() {
 
   const moreMetrics = computed(() => {
     const ev = nutritionEvaluation.value
-    const keys = ['fat', 'carbs', 'fiber'] as const
+    const keys = ['fat', 'carbs', 'fiber', 'sodium'] as const
     return keys.map(k => {
       const valueKey = `total${k.charAt(0).toUpperCase() + k.slice(1)}` as keyof typeof todayNutrition
       const val = todayNutrition[valueKey] as number

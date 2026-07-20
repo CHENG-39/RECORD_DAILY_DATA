@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import type { FoodRecord, DailyNutrition, NutritionGoals, UserMode, FoodDefinition } from '@/types'
+import type { FoodRecord, DailyNutrition, NutritionGoals, UserMode, FoodDefinition, LifestyleProfile, SuggestionFeedback } from '@/types'
 import { generateId, getTodayString, calculateNutritionTotals, calculateGoalsFromWeight } from '@/utils'
 import { DEFAULT_NUTRITION_GOALS } from '@/constants'
 import { BUILT_IN_FOODS, getPhosphorusBioavailability } from '@/data/foods'
@@ -9,6 +9,13 @@ export const useDietStore = defineStore('diet', () => {
   const records = ref<FoodRecord[]>([])
   const goals = ref<NutritionGoals>({ ...DEFAULT_NUTRITION_GOALS })
   const userMode = ref<UserMode>('normal')
+  const lifestyleProfile = ref<LifestyleProfile>({
+    mealSource: 'mixed',
+    cookingAccess: 'limited',
+    priority: 'balance',
+    configured: false,
+  })
+  const suggestionFeedback = ref<SuggestionFeedback[]>([])
   const customFoods = ref<FoodDefinition[]>([])
   const bodyWeight = ref<number | null>(null) // 用户体重 (kg)
 
@@ -16,17 +23,21 @@ export const useDietStore = defineStore('diet', () => {
     return [...BUILT_IN_FOODS, ...customFoods.value]
   })
 
-  /** 迁移旧记录：为缺少 bioavailablePhosphorus 的记录补充该字段 */
+  /** 迁移旧记录：补齐后续版本新增的营养字段。 */
   let _migrating = false
   function migrateOldRecords(): void {
     if (_migrating) return
     let changed = false
     const all = allFoods.value
     for (const r of records.value) {
+      const food = all.find(f => f.id === r.foodType || f.name === r.foodName)
       if (r.bioavailablePhosphorus === undefined || r.bioavailablePhosphorus === null) {
-        const food = all.find(f => f.id === r.foodType || f.name === r.foodName)
         const coeff = food ? getPhosphorusBioavailability(food.category) : 0.40
         r.bioavailablePhosphorus = Math.round(r.phosphorus * coeff)
+        changed = true
+      }
+      if (r.sodium === undefined || r.sodium === null) {
+        r.sodium = food ? Number((food.sodium * r.weight / 100).toFixed(1)) : 0
         changed = true
       }
     }
@@ -55,6 +66,7 @@ export const useDietStore = defineStore('diet', () => {
       totalFiber: totals.totalFiber,
       totalPotassium: totals.totalPotassium,
       totalPhosphorus: totals.totalPhosphorus,
+      totalSodium: totals.totalSodium,
       totalBioavailablePhosphorus: totals.totalBioavailablePhosphorus,
       totalPRAL: totals.totalPRAL,
       records: recs,
@@ -90,6 +102,14 @@ export const useDietStore = defineStore('diet', () => {
 
   function setUserMode(mode: UserMode): void {
     userMode.value = mode
+  }
+
+  function updateLifestyleProfile(profile: Omit<LifestyleProfile, 'configured'>): void {
+    lifestyleProfile.value = { ...profile, configured: true }
+  }
+
+  function recordSuggestionFeedback(feedback: SuggestionFeedback): void {
+    suggestionFeedback.value = [...suggestionFeedback.value, feedback].slice(-90)
   }
 
   /** 设置体重并自动重算每日营养目标 */
@@ -134,6 +154,8 @@ export const useDietStore = defineStore('diet', () => {
     records,
     goals,
     userMode,
+    lifestyleProfile,
+    suggestionFeedback,
     bodyWeight,
     todayRecords,
     todayNutrition,
@@ -142,6 +164,8 @@ export const useDietStore = defineStore('diet', () => {
     deleteRecord,
     updateGoals,
     setUserMode,
+    updateLifestyleProfile,
+    recordSuggestionFeedback,
     setBodyWeight,
     customFoods,
     allFoods,

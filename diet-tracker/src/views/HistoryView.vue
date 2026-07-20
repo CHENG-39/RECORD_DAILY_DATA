@@ -144,7 +144,7 @@ const nutrientRanges = computed(() => {
 const summaryItems = computed(() => {
   const ranges = nutrientRanges.value
   const isKidney = dietStore.userMode === 'kidney'
-  const keys = ['calories', 'protein', 'fat', 'carbs', 'fiber', 'potassium', 'phosphorus'] as const
+  const keys = ['calories', 'protein', 'fat', 'carbs', 'fiber', 'potassium', 'phosphorus', 'sodium'] as const
   const valueMap: Record<string, number> = {
     calories: selectedDateNutrition.value.totalCalories,
     protein: selectedDateNutrition.value.totalProtein,
@@ -152,6 +152,7 @@ const summaryItems = computed(() => {
     carbs: selectedDateNutrition.value.totalCarbs,
     fiber: selectedDateNutrition.value.totalFiber,
     potassium: selectedDateNutrition.value.totalPotassium,
+    sodium: selectedDateNutrition.value.totalSodium,
     phosphorus: isKidney
       ? selectedDateNutrition.value.totalBioavailablePhosphorus
       : selectedDateNutrition.value.totalPhosphorus,
