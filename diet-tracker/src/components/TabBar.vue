@@ -29,6 +29,6 @@ const active = computed(() => pathMap[route.path] ?? 0)
 }
 
 :deep(.van-tabbar-item--active) {
-  color: #4facfe;
+  color: #237a64;
 }
 </style>

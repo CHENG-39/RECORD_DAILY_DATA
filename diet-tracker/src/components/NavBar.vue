@@ -69,8 +69,8 @@ function switchMode(mode: 'normal' | 'kidney'): void {
 .weight-badge {
   font-size: 11px;
   font-weight: 500;
-  color: #4facfe;
-  background: #e8f4fd;
+  color: #237a64;
+  background: #e8f4ef;
   padding: 4px 8px;
   border-radius: 10px;
   cursor: pointer;
@@ -96,7 +96,7 @@ function switchMode(mode: 'normal' | 'kidney'): void {
 
 .nav-mode-chip.active {
   background: #fff;
-  color: #4facfe;
+  color: #237a64;
   box-shadow: 0 1px 2px rgba(0,0,0,0.06);
 }
 </style>

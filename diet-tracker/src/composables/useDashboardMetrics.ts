@@ -37,7 +37,7 @@ export function useDashboardMetrics() {
     const rate = calorieRate.value
     if (rate > 110) return '#ee0a24'
     if (rate > 100) return '#ff976a'
-    return dietStore.userMode === 'kidney' ? '#e6a23c' : '#4facfe'
+    return dietStore.userMode === 'kidney' ? '#d8893a' : '#237a64'
   })
 
   const ringOffset = computed(() => {
@@ -89,7 +89,7 @@ export function useDashboardMetrics() {
         } else if (item.current < 0) {
           statusText = '优'; status = 'ok'; color = '#07c160'
         } else {
-          statusText = '正常'; status = 'ok'; color = '#4facfe'
+          statusText = '正常'; status = 'ok'; color = '#3478c7'
         }
       } else if (isUpperLimit) {
         if (item.current > max) { statusText = '超标'; color = '#ee0a24'; status = 'danger' }

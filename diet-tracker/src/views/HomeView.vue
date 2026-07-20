@@ -140,6 +140,20 @@
         </div>
       </div>
 
+      <div class="actions actions-primary">
+        <van-button type="primary" block round @click="openAddDialog">
+          <van-icon name="add-o" /> 添加饮食记录
+        </van-button>
+        <div class="action-shortcuts">
+          <van-button plain @click="copyYesterdayRecords" :disabled="yesterdayRecords.length === 0">
+            <van-icon name="replay" /> 复用昨天
+          </van-button>
+          <van-button plain @click="router.push('/foods')">
+            <van-icon name="search" /> 浏览食物库
+          </van-button>
+        </div>
+      </div>
+
       <div class="lifestyle-card" @click="openLifestyleDialog">
         <div class="lifestyle-icon"><van-icon name="friends-o" size="20" /></div>
         <div class="lifestyle-copy">
@@ -167,20 +181,30 @@
         </div>
       </div>
 
-      <!-- ===== 操作按钮 ===== -->
-      <div class="actions">
-        <van-button type="primary" block round @click="openAddDialog">
-          <van-icon name="add-o" /> 添加饮食记录
-        </van-button>
-        <div class="action-shortcuts">
-          <van-button plain @click="copyYesterdayRecords" :disabled="yesterdayRecords.length === 0">
-            <van-icon name="replay" /> 复用昨天
-          </van-button>
-          <van-button plain @click="router.push('/foods')">
-            <van-icon name="search" /> 浏览食物库
-          </van-button>
+      <section class="meal-rhythm" aria-label="今日用餐节奏">
+        <div class="meal-rhythm-header">
+          <div>
+            <span>今天的用餐节奏</span>
+            <small>轻点餐次即可开始记录</small>
+          </div>
+          <span class="meal-rhythm-count">{{ todayRecords.length }} 项</span>
         </div>
-      </div>
+        <div class="meal-rhythm-grid">
+          <button
+            v-for="meal in mealRhythm"
+            :key="meal.type"
+            type="button"
+            class="meal-rhythm-item"
+            :class="`meal-rhythm-${meal.type}`"
+            @click="openAddForMeal(meal.type)"
+          >
+            <span class="meal-rhythm-dot"></span>
+            <span class="meal-rhythm-name">{{ meal.label }}</span>
+            <strong>{{ meal.count ? `${meal.count} 项` : '待记录' }}</strong>
+            <small>{{ meal.count ? `${meal.calories} kcal` : '点击添加' }}</small>
+          </button>
+        </div>
+      </section>
 
       <!-- ===== 今日记录（按餐次分组） ===== -->
       <div class="records-section">
@@ -461,6 +485,18 @@ const mealGroups = computed(() => {
     })
 })
 
+const mealRhythm = computed(() => {
+  return mealOrder.map(type => {
+    const mealRecords = todayRecords.filter(record => record.mealType === type)
+    return {
+      type,
+      label: MEAL_TYPES[type],
+      count: mealRecords.length,
+      calories: Math.round(mealRecords.reduce((sum, record) => sum + record.calories, 0)),
+    }
+  })
+})
+
 // ========== 添加/编辑记录 ==========
 
 const showAddDialog = ref(false)
@@ -585,6 +621,12 @@ function openAddDialog(): void {
   foodSearchText.value = ''
   activeCategory.value = ''
   showAddDialog.value = true
+}
+
+function openAddForMeal(mealType: FoodRecord['mealType']): void {
+  openAddDialog()
+  inputMealType.value = mealType
+  isAutoMeal.value = false
 }
 
 function openEditDialog(record: FoodRecord): void {
@@ -864,6 +906,32 @@ function saveWeight(): void {
 .next-meal-card small { display: block; color: #658278; font-size: 11px; line-height: 1.45; }
 .suggestion-actions { display: flex; gap: 8px; margin-top: 12px; }
 .suggestion-actions :deep(.van-button) { min-width: 88px; }
+
+.meal-rhythm {
+  margin-bottom: 14px;
+  padding: 14px;
+  background: #fff;
+  border: 1px solid #edf0f2;
+  border-radius: 8px;
+}
+
+.meal-rhythm-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; }
+.meal-rhythm-header > div { display: flex; flex-direction: column; gap: 2px; }
+.meal-rhythm-header span { color: #333; font-size: 14px; font-weight: 700; }
+.meal-rhythm-header small { color: #999; font-size: 11px; }
+.meal-rhythm-count { color: #3b7864 !important; font-size: 11px !important; font-weight: 600 !important; }
+
+.meal-rhythm-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
+.meal-rhythm-item { min-width: 0; padding: 9px 4px; text-align: center; font: inherit; background: #f8fafb; border: 1px solid transparent; border-radius: 7px; }
+.meal-rhythm-item:active { transform: translateY(1px); }
+.meal-rhythm-dot { display: block; width: 7px; height: 7px; margin: 0 auto 5px; border-radius: 50%; background: #a9b8be; }
+.meal-rhythm-name { display: block; overflow: hidden; color: #59666b; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.meal-rhythm-item strong { display: block; margin-top: 3px; color: #263437; font-size: 12px; }
+.meal-rhythm-item small { display: block; margin-top: 2px; color: #9aa6aa; font-size: 10px; white-space: nowrap; }
+.meal-rhythm-breakfast .meal-rhythm-dot { background: #e9a84c; }
+.meal-rhythm-lunch .meal-rhythm-dot { background: #3b9d7a; }
+.meal-rhythm-dinner .meal-rhythm-dot { background: #5e78c9; }
+.meal-rhythm-snack .meal-rhythm-dot { background: #d37c9a; }
 
 .step-num {
   width: 28px;
@@ -1494,4 +1562,70 @@ function saveWeight(): void {
   color: #999;
   text-align: center;
 }
+
+/* Home information hierarchy: status, action, meal rhythm, guidance, context, history. */
+.home-view { background: #f6f7f6; }
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 12px 14px 18px;
+}
+
+.welcome-card,
+.dashboard { order: 1; }
+
+.actions-primary { order: 2; }
+.meal-rhythm { order: 3; }
+.next-meal-card { order: 4; }
+.lifestyle-card { order: 5; }
+.records-section { order: 6; }
+
+.dashboard,
+.welcome-card {
+  border: 1px solid #e6ebe8;
+  box-shadow: none;
+}
+
+.dashboard { border-radius: 10px; }
+.welcome-card { border-radius: 10px; }
+
+.actions { margin: 0 0 14px; }
+.actions :deep(.van-button) { height: 44px; font-size: 14px; font-weight: 650; }
+.actions :deep(.van-button--primary) { background: #237a64; border-color: #237a64; }
+.actions :deep(.van-button--plain) { color: #2e6e5c; background: #fff; border-color: #b9d9cb; }
+
+.lifestyle-card {
+  margin-bottom: 14px;
+  background: #fff;
+  border: 1px solid #e6ebe8;
+  border-radius: 10px;
+}
+
+.lifestyle-icon { color: #237a64; background: #e8f4ef; }
+
+.next-meal-card {
+  background: #eff8f2;
+  border-color: #cce5d5;
+  border-radius: 10px;
+}
+
+.meal-rhythm { border-radius: 10px; }
+.meal-rhythm-breakfast { background: #fff8ec; }
+.meal-rhythm-lunch { background: #eff8f2; }
+.meal-rhythm-dinner { background: #f1f4fc; }
+.meal-rhythm-snack { background: #fdf1f5; }
+
+.meal-rhythm-item { border-color: transparent; }
+.meal-rhythm-item:active { border-color: #bad8cc; }
+
+.step-num.active,
+.count-badge,
+.qw-btn.active,
+.chip.active { background: #237a64; }
+
+.dot-breakfast { background: #e9a84c; }
+.nutrition-preview { background: #edf8f2; }
+.preview-title { color: #237a64; }
 </style>

@@ -37,8 +37,8 @@ export default defineConfig({
         name: '饮食追踪',
         short_name: '饮食追踪',
         description: '记录每日饮食，追踪营养摄入',
-        theme_color: '#4facfe',
-        background_color: '#f5f7fa',
+        theme_color: '#237a64',
+        background_color: '#f6f7f6',
         display: 'standalone',
         orientation: 'portrait',
         icons: [
