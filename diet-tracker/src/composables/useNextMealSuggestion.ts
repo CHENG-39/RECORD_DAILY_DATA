@@ -1,6 +1,6 @@
 import { computed, ref, watch } from 'vue'
 import { useDietStore } from '@/stores/diet'
-import { getNutrientSafeRanges } from '@/utils'
+import { getPersonalizedNutrientRanges } from '@/utils'
 
 export interface NextMealSuggestion {
   key: string
@@ -39,7 +39,7 @@ export function useNextMealSuggestion() {
     const nutrition = dietStore.todayNutrition
     const profile = dietStore.lifestyleProfile
     const weight = dietStore.bodyWeight || 60
-    const ranges = getNutrientSafeRanges(weight, dietStore.userMode)
+    const ranges = getPersonalizedNutrientRanges(weight, dietStore.userMode, dietStore.personalCarePlan)
 
     if (nutrition.records.length === 0) {
       return [{

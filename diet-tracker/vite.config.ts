@@ -6,8 +6,9 @@ import pxToViewport from 'postcss-px-to-viewport-8-plugin'
 import { VitePWA } from 'vite-plugin-pwa'
 import { fileURLToPath, URL } from 'node:url'
 
-export default defineConfig({
-  base: '/RECORD_DAILY_DATA/',
+export default defineConfig(({ mode }) => ({
+  // Android WebView loads bundled assets locally and cannot use the web deployment subpath.
+  base: mode === 'android' ? './' : '/RECORD_DAILY_DATA/',
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
@@ -84,4 +85,4 @@ export default defineConfig({
     },
     cssMinify: 'lightningcss',
   },
-})
+}))

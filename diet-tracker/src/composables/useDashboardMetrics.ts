@@ -1,7 +1,7 @@
 import { ref, computed } from 'vue'
 import { useDietStore } from '@/stores/diet'
 import { NUTRITION_LABELS, UNIT_LABELS } from '@/constants'
-import { evaluateIntake, getNutrientSafeRanges, getPRALStatus } from '@/utils'
+import { evaluateIntake, getPersonalizedNutrientRanges, getPRALStatus } from '@/utils'
 
 export function useDashboardMetrics() {
   const dietStore = useDietStore()
@@ -11,7 +11,7 @@ export function useDashboardMetrics() {
 
   const nutrientRanges = computed(() => {
     const w = dietStore.bodyWeight || 60
-    return getNutrientSafeRanges(w, dietStore.userMode)
+    return getPersonalizedNutrientRanges(w, dietStore.userMode, dietStore.personalCarePlan)
   })
 
   const nutritionEvaluation = computed(() =>

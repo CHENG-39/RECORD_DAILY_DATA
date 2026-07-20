@@ -1,18 +1,13 @@
 <template>
   <div class="home-view" :class="{ 'mode-kidney': dietStore.userMode === 'kidney' }">
-    <NavBar @open-weight="showWeightDialog = true" />
-
-    <!-- 养生模式提示 -->
-    <div v-if="dietStore.userMode === 'kidney'" class="kidney-banner">
-      <span>低蛋白 · 控钾 · 限磷 — KDIGO 2024</span>
-    </div>
+    <NavBar @open-weight="openWeightDialog" />
 
     <div class="content">
       <!-- ===== 营养仪表盘 ===== -->
       <div v-if="isNewUser" class="welcome-card">
         <div class="welcome-title">开始记录饮食</div>
         <div class="welcome-steps">
-          <div class="welcome-step" @click="showWeightDialog = true">
+          <div class="welcome-step" @click="openWeightDialog">
             <span class="step-num active">1</span>
             <div class="step-text">
               <span class="step-title">设置体重</span>
@@ -140,16 +135,54 @@
         </div>
       </div>
 
+      <section v-if="!isNewUser" class="daily-review" :class="`review-${summary.level}`" aria-label="今日营养摘要">
+        <div class="daily-review-heading">
+          <div>
+            <span>今日营养摘要</span>
+            <small>{{ basis }}</small>
+          </div>
+          <span class="review-quality" :class="`quality-${dataQuality.level}`">{{ dataQuality.label }}</span>
+        </div>
+        <strong>{{ summary.title }}</strong>
+        <p>{{ summary.detail }}</p>
+        <div v-if="reviewItems.length" class="review-items">
+          <div v-for="item in reviewItems" :key="item.key" class="review-item" :class="`item-${item.level}`">
+            <div>
+              <span>{{ item.label }}</span>
+              <small>{{ item.threshold }}</small>
+            </div>
+            <strong>{{ item.value }}</strong>
+          </div>
+        </div>
+        <small class="review-data-detail">{{ dataQuality.detail }}</small>
+        <small v-if="dietStore.userMode === 'kidney'" class="review-disclaimer">肾脏相关指标仅基于已记录饮食估算，不能替代医嘱、血液检查或处方。</small>
+      </section>
+
+      <div v-if="dietStore.userMode === 'kidney'" class="care-plan-card" @click="openCarePlanDialog">
+        <div class="care-plan-icon"><van-icon name="shield-o" size="19" /></div>
+        <div class="care-plan-copy">
+          <span>个人方案</span>
+          <small>{{ carePlanSummary }}</small>
+        </div>
+        <van-icon name="arrow" size="15" color="#9b8b70" />
+      </div>
+
       <div class="actions actions-primary">
         <van-button type="primary" block round @click="openAddDialog">
           <van-icon name="add-o" /> 添加饮食记录
         </van-button>
         <div class="action-shortcuts">
+          <van-button plain @click="openMealTemplatePicker">
+            <van-icon name="label-o" /> 常用餐
+          </van-button>
           <van-button plain @click="copyYesterdayRecords" :disabled="yesterdayRecords.length === 0">
             <van-icon name="replay" /> 复用昨天
           </van-button>
           <van-button plain @click="router.push('/foods')">
             <van-icon name="search" /> 浏览食物库
+          </van-button>
+          <van-button plain @click="showMealComposer = true">
+            <van-icon name="apps-o" /> 组合餐
           </van-button>
         </div>
       </div>
@@ -221,6 +254,7 @@
               <span class="meal-divider"></span>
               <span class="meal-subtotal">{{ group.subtotal }} kcal</span>
               <span class="meal-count">{{ group.records.length }}项</span>
+              <van-icon name="bookmark-o" size="15" class="meal-template-save" @click.stop="openSaveMealTemplate(group)" />
             </div>
             <van-swipe-cell v-for="record in group.records" :key="record.id">
               <template #left>
@@ -293,6 +327,18 @@
           @click="inputWeight = w"
         >{{ w }}{{ weightQuickUnit }}</span>
       </div>
+      <div class="meal-source-picker">
+        <span>用餐场景</span>
+        <div class="meal-source-options">
+          <button
+            v-for="option in mealSourceOptions"
+            :key="option.value"
+            type="button"
+            :class="{ active: inputMealSource === option.value }"
+            @click="inputMealSource = option.value"
+          >{{ option.label }}</button>
+        </div>
+      </div>
       <van-field
         :model-value="MEAL_TYPES[inputMealType] + (isAutoMeal ? ' · 自动' : '')"
         label="餐次"
@@ -300,6 +346,10 @@
         is-link
         @click="showMealPicker = true"
       />
+      <div v-if="!isEditing" class="continue-meal-option">
+        <van-checkbox v-model="keepAddingMealItems">保存后继续添加同一餐</van-checkbox>
+        <small>适合食堂和外卖，把主食、菜品、肉蛋等分项记录</small>
+      </div>
       <div class="nutrition-preview" v-if="previewNutrition">
         <div class="preview-title">营养预估</div>
         <div class="preview-grid">
@@ -355,7 +405,10 @@
                   </span>
                 </span>
               </div>
-              <van-icon v-if="inputFood?.id === food.id" name="success" color="#07c160" size="16" />
+              <div class="food-actions">
+                <van-icon name="info-o" size="17" color="#7b8a84" @click.stop="openFoodDetail(food)" />
+                <van-icon v-if="inputFood?.id === food.id" name="success" color="#237a64" size="16" />
+              </div>
             </div>
           </template>
         </div>
@@ -365,11 +418,89 @@
       </div>
     </van-popup>
 
+    <van-action-sheet v-model:show="showFoodDetail" :title="foodDetail?.name || '食物详情'" :close-on-click-action="false">
+      <div v-if="foodDetail" class="food-detail-sheet">
+        <div class="food-detail-meta">
+          <span class="food-detail-category">{{ foodDetail.category }}</span>
+          <span>{{ foodDataConfidenceLabel(foodDetail) }}</span>
+        </div>
+        <p class="food-detail-serving">{{ foodDetailServingHint }}</p>
+        <div class="food-detail-grid">
+          <div v-for="item in foodDetailNutrients" :key="item.label" class="food-detail-nutrient">
+            <strong>{{ item.value }}</strong>
+            <span>{{ item.label }}</span>
+          </div>
+        </div>
+        <div class="food-detail-source">
+          <span>数据来源</span>
+          <p>{{ foodDataSourceLabel(foodDetail) }}</p>
+        </div>
+        <van-button type="primary" block @click="selectFoodFromDetail">
+          选用这项食物
+        </van-button>
+      </div>
+    </van-action-sheet>
+
+    <van-dialog v-model:show="showSaveTemplateDialog" title="保存为常用餐" show-cancel-button @confirm="saveMealTemplate">
+      <van-field v-model="templateName" label="名称" placeholder="例如：食堂午餐组合" maxlength="20" />
+      <div class="template-dialog-hint">将保存当前餐次的食物、份量和用餐场景，可随时复用。</div>
+    </van-dialog>
+
+    <van-dialog v-model:show="showCarePlanDialog" title="个人方案" show-cancel-button @confirm="saveCarePlan">
+      <div class="care-plan-form">
+        <span>方案来源</span>
+        <van-radio-group v-model="carePlanSource" direction="horizontal" class="care-plan-options">
+          <van-radio name="clinician">医疗/营养专业人员</van-radio>
+          <van-radio name="self">自行记录</van-radio>
+        </van-radio-group>
+        <template v-if="carePlanSource === 'clinician'">
+          <span class="care-plan-target-title">按已有方案录入每日上限（可选）</span>
+          <div class="care-plan-targets">
+            <van-field v-model.number="carePlanTargets.protein" type="number" label="蛋白质" placeholder="g/日"><template #extra>g</template></van-field>
+            <van-field v-model.number="carePlanTargets.potassium" type="number" label="钾" placeholder="mg/日"><template #extra>mg</template></van-field>
+            <van-field v-model.number="carePlanTargets.phosphorus" type="number" label="磷" placeholder="mg/日"><template #extra>mg</template></van-field>
+            <van-field v-model.number="carePlanTargets.sodium" type="number" label="钠" placeholder="mg/日"><template #extra>mg</template></van-field>
+          </div>
+        </template>
+      </div>
+      <van-field v-model="carePlanReviewDate" type="date" label="复核日期" placeholder="可选" />
+      <van-field v-model="carePlanNote" type="textarea" rows="3" autosize label="方案备注" placeholder="可记录已有饮食限制、复诊提醒或需咨询的问题" />
+      <p class="care-plan-disclaimer">此处仅保存你已有的方案信息，不生成治疗处方，也不替代医疗团队的建议。</p>
+    </van-dialog>
+
+    <van-action-sheet v-model:show="showMealTemplatePicker" title="常用餐">
+      <div class="template-picker-list">
+        <button
+          v-for="template in mealTemplates"
+          :key="template.id"
+          type="button"
+          class="template-picker-item"
+          @click="applySelectedMealTemplate(template.id)"
+        >
+          <span class="template-picker-copy">
+            <strong>{{ template.name }}</strong>
+            <small>{{ MEAL_TYPES[template.mealType] }} · {{ template.items.length }} 项</small>
+          </span>
+          <span class="template-picker-actions">
+            <van-icon name="arrow" size="14" />
+            <van-icon name="delete-o" size="16" @click.stop="removeMealTemplate(template.id)" />
+          </span>
+        </button>
+      </div>
+    </van-action-sheet>
+
     <!-- 餐次选择 -->
     <van-action-sheet v-model:show="showMealPicker" :actions="mealTypeActions" cancel-text="取消" @select="onMealTypeSelect" />
 
     <!-- 术语帮助 -->
     <GlossarySheet ref="glossaryRef" />
+    <MealComposerSheet
+      v-model="showMealComposer"
+      :foods="allFoods"
+      :default-meal-type="getCurrentMealType()"
+      :default-source="dietStore.lifestyleProfile.mealSource"
+      @save="addComposedMeal"
+    />
 
     <!-- 体重设置 -->
     <van-dialog v-model:show="showWeightDialog" title="设置体重" show-cancel-button @confirm="saveWeight">
@@ -416,10 +547,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import dayjs from 'dayjs'
-import type { FoodRecord, FoodDefinition, MealSource, CookingAccess, LifestylePriority } from '@/types'
+import type { FoodRecord, FoodDefinition, MealSource, CookingAccess, LifestylePriority, PersonalCarePlan, PersonalCarePlanTargets } from '@/types'
 import { useDietStore } from '@/stores/diet'
 import { MEAL_TYPES } from '@/constants'
 import { getTodayString, formatWeight, getCurrentMealType, calculatePRAL, getPRALStatus } from '@/utils'
@@ -427,36 +558,22 @@ import { calculateNutritionFromDefinition } from '@/constants/nutrition'
 import { getPotassiumRisk, getPhosphorusRisk, getPtoProteinRatio, getPtoProteinLevel, getPhosphorusBioavailability, FOOD_CATEGORIES } from '@/data/foods'
 import { useDashboardMetrics } from '@/composables/useDashboardMetrics'
 import { useNextMealSuggestion } from '@/composables/useNextMealSuggestion'
+import { useDailySafetyReview } from '@/composables/useDailySafetyReview'
 import NavBar from '@/components/NavBar.vue'
 import TabBar from '@/components/TabBar.vue'
 import GlossarySheet from '@/components/GlossarySheet.vue'
+import MealComposerSheet from '@/components/MealComposerSheet.vue'
 import { showConfirmDialog, showToast } from 'vant'
 
 const dietStore = useDietStore()
 const router = useRouter()
-const { records, todayRecords, todayNutrition, allFoods, addRecord, updateRecord, deleteRecord } = dietStore
+const { records, todayRecords, todayNutrition, allFoods, addRecord, updateRecord, deleteRecord, mealTemplates } = dietStore
 
 const isNewUser = computed(() => !dietStore.bodyWeight && todayRecords.length === 0)
 
 // ========== 体重输入（在目标弹窗中使用） ==========
 
 const weightInput = ref<number | undefined>(dietStore.bodyWeight ?? undefined)
-
-let weightTimer: ReturnType<typeof setTimeout> | null = null
-watch(weightInput, (val) => {
-  if (weightTimer) clearTimeout(weightTimer)
-  weightTimer = setTimeout(() => {
-    if (val && val >= 30 && val <= 200) {
-      dietStore.setBodyWeight(val)
-    }
-  }, 500)
-})
-
-watch(() => dietStore.bodyWeight, (val) => {
-  if (val !== weightInput.value) {
-    weightInput.value = val ?? undefined
-  }
-})
 
 // ========== 营养仪表盘 ==========
 
@@ -470,6 +587,7 @@ const {
   showMoreMetrics,
 } = useDashboardMetrics()
 const { suggestion, hasAlternative, showAlternative } = useNextMealSuggestion()
+const { dataQuality, reviewItems, summary, basis } = useDailySafetyReview()
 
 // ========== 按餐次分组 ==========
 
@@ -504,6 +622,11 @@ const showFoodPicker = ref(false)
 const showMealPicker = ref(false)
 const showWeightDialog = ref(false)
 const showLifestyleDialog = ref(false)
+const showFoodDetail = ref(false)
+const showSaveTemplateDialog = ref(false)
+const showMealTemplatePicker = ref(false)
+const showCarePlanDialog = ref(false)
+const showMealComposer = ref(false)
 const glossaryRef = ref<InstanceType<typeof GlossarySheet> | null>(null)
 
 const isEditing = ref(false)
@@ -511,9 +634,19 @@ const editingRecordId = ref<string | null>(null)
 const inputFood = ref<FoodDefinition | null>(null)
 const inputWeight = ref<number>()
 const inputMealType = ref<FoodRecord['mealType']>('breakfast')
+const inputMealSource = ref<MealSource>(dietStore.lifestyleProfile.mealSource)
 const isAutoMeal = ref(true)
+const keepAddingMealItems = ref(false)
 const foodSearchText = ref('')
 const activeCategory = ref('')
+const foodDetail = ref<FoodDefinition | null>(null)
+const templateName = ref('')
+const templateMealType = ref<FoodRecord['mealType']>('breakfast')
+const templateRecords = ref<Array<Omit<FoodRecord, 'id' | 'date'>>>([])
+const carePlanSource = ref<PersonalCarePlan['source']>(dietStore.personalCarePlan.source)
+const carePlanReviewDate = ref(dietStore.personalCarePlan.reviewDate || '')
+const carePlanNote = ref(dietStore.personalCarePlan.note)
+const carePlanTargets = reactive<PersonalCarePlanTargets>({ ...dietStore.personalCarePlan.targets })
 
 const lifestyleMealSource = ref<MealSource>(dietStore.lifestyleProfile.mealSource)
 const lifestyleCookingAccess = ref<CookingAccess>(dietStore.lifestyleProfile.cookingAccess)
@@ -528,6 +661,15 @@ const lifestyleSummary = computed(() => {
     balance: '优先营养均衡', time: '优先省时间', budget: '优先省钱',
   }
   return `${mealSourceLabels[dietStore.lifestyleProfile.mealSource]} · ${priorityLabels[dietStore.lifestyleProfile.priority]}`
+})
+
+const carePlanSummary = computed(() => {
+  const plan = dietStore.personalCarePlan
+  if (!plan.enabled) return '保存已有医嘱与复核提醒'
+  const source = plan.source === 'clinician' ? '已记录专业方案' : '已保存个人备注'
+  const targetCount = plan.targets ? Object.values(plan.targets).filter(value => typeof value === 'number' && value > 0).length : 0
+  const targetText = targetCount ? ` · ${targetCount} 项目标` : ''
+  return plan.reviewDate ? `${source}${targetText} · ${plan.reviewDate} 复核` : `${source}${targetText}`
 })
 
 const isCountFood = computed(() => inputFood.value?.unit === '1个')
@@ -591,6 +733,13 @@ const filteredFoods = computed(() => {
 })
 
 const mealTypeActions = Object.entries(MEAL_TYPES).map(([key, value]) => ({ name: value, value: key }))
+const mealSourceOptions: Array<{ value: MealSource; label: string }> = [
+  { value: 'home', label: '家里' },
+  { value: 'canteen', label: '食堂' },
+  { value: 'takeout', label: '外卖' },
+  { value: 'convenience', label: '便利店' },
+  { value: 'mixed', label: '混合' },
+]
 
 const selectedFoodLabel = computed(() => inputFood.value?.name ?? '')
 const selectedFoodWeightHint = computed(() => {
@@ -611,13 +760,51 @@ const previewNutrition = computed(() => {
   return calculateNutritionFromDefinition(inputFood.value!, w)
 })
 
+const foodDetailNutrients = computed(() => {
+  if (!foodDetail.value) return []
+  const food = foodDetail.value
+  return [
+    { label: '热量', value: `${food.calories} kcal` },
+    { label: '蛋白质', value: `${food.protein} g` },
+    { label: '钠', value: `${food.sodium} mg` },
+    { label: '钾', value: `${food.potassium} mg` },
+    { label: '磷', value: `${food.phosphorus} mg` },
+    { label: '膳食纤维', value: `${food.fiber} g` },
+  ]
+})
+
+const foodDetailServingHint = computed(() => {
+  const food = foodDetail.value
+  if (!food) return ''
+  if (food.unitWeight) return `营养数据按每 100g 计算；1 个约 ${food.unitWeight}g。`
+  if (food.displayUnit === 'ml') return '营养数据按每 100ml 计算；记录时可直接输入毫升。'
+  return '营养数据按每 100g 计算；记录时可使用 50、100、150 或 200g 快捷份量。'
+})
+
+function foodDataConfidenceLabel(food: FoodDefinition): string {
+  const labels = {
+    reference: '权威参考数据',
+    label: '包装标签数据',
+    estimate: '估算数据',
+    user: '用户录入',
+  } as const
+  return food.dataConfidence ? labels[food.dataConfidence] : (food.isBuiltIn ? '内置参考数据' : '用户录入')
+}
+
+function foodDataSourceLabel(food: FoodDefinition): string {
+  if (food.dataSource && food.sourceReference) return `${food.dataSource} · ${food.sourceReference}`
+  return food.isBuiltIn ? '内置食物参考数据；复合菜和品牌食品请优先核对包装标签。' : '由用户自行录入；请以包装营养成分表或专业资料核对。'
+}
+
 function openAddDialog(): void {
   isEditing.value = false
   editingRecordId.value = null
   inputFood.value = null
   inputWeight.value = undefined
   inputMealType.value = getCurrentMealType()
+  inputMealSource.value = dietStore.lifestyleProfile.mealSource
   isAutoMeal.value = true
+  keepAddingMealItems.value = false
   foodSearchText.value = ''
   activeCategory.value = ''
   showAddDialog.value = true
@@ -641,6 +828,8 @@ function openEditDialog(record: FoodRecord): void {
     inputWeight.value = record.weight
   }
   inputMealType.value = record.mealType
+  inputMealSource.value = record.source ?? dietStore.lifestyleProfile.mealSource
+  keepAddingMealItems.value = false
   foodSearchText.value = ''
   activeCategory.value = ''
   showAddDialog.value = true
@@ -650,6 +839,17 @@ function onFoodSelect(food: FoodDefinition): void {
   inputFood.value = food
   foodSearchText.value = ''
   showFoodPicker.value = false
+}
+
+function openFoodDetail(food: FoodDefinition): void {
+  foodDetail.value = food
+  showFoodDetail.value = true
+}
+
+function selectFoodFromDetail(): void {
+  if (!foodDetail.value) return
+  onFoodSelect(foodDetail.value)
+  showFoodDetail.value = false
 }
 
 function onMealTypeSelect(item: { value: string }): void {
@@ -681,6 +881,7 @@ function handleBeforeClose(action: string): boolean {
     sodium: nutrition.sodium,
     bioavailablePhosphorus: Math.round(nutrition.phosphorus * bioavailability),
     mealType: inputMealType.value,
+    source: inputMealSource.value,
     date: getTodayString(),
   }
 
@@ -689,6 +890,14 @@ function handleBeforeClose(action: string): boolean {
     showToast({ message: '修改成功', icon: 'success', duration: 1000 })
   } else {
     addRecord(recordData)
+    if (keepAddingMealItems.value) {
+      inputFood.value = null
+      inputWeight.value = undefined
+      foodSearchText.value = ''
+      activeCategory.value = ''
+      showToast({ message: '已添加，继续记录同一餐', icon: 'success', duration: 1000 })
+      return false
+    }
     showToast({ message: '添加成功', icon: 'success', duration: 1000 })
   }
   return true
@@ -696,8 +905,80 @@ function handleBeforeClose(action: string): boolean {
 
 function handleDelete(id: string): void { deleteRecord(id) }
 
+function addComposedMeal(payload: { items: Array<{ food: FoodDefinition; weight: number }>; mealType: FoodRecord['mealType']; source: MealSource }): void {
+  for (const item of payload.items) {
+    const nutrition = calculateNutritionFromDefinition(item.food, item.weight)
+    addRecord({
+      foodType: item.food.id,
+      foodName: item.food.name,
+      weight: item.weight,
+      ...nutrition,
+      bioavailablePhosphorus: Math.round(nutrition.phosphorus * getPhosphorusBioavailability(item.food.category)),
+      mealType: payload.mealType,
+      source: payload.source,
+      date: getTodayString(),
+    })
+  }
+  showToast({ message: `已记录 ${payload.items.length} 项组合餐`, icon: 'success', duration: 1200 })
+}
+
+function openSaveMealTemplate(group: { type: FoodRecord['mealType']; records: FoodRecord[] }): void {
+  templateMealType.value = group.type
+  templateRecords.value = group.records.map(record => {
+    const { id: _id, date: _date, ...item } = record
+    return item
+  })
+  templateName.value = `${MEAL_TYPES[group.type]}组合`
+  showSaveTemplateDialog.value = true
+}
+
+function saveMealTemplate(): void {
+  if (!templateName.value.trim() || templateRecords.value.length === 0) {
+    showToast('请输入名称后再保存')
+    return
+  }
+  dietStore.addMealTemplate({
+    name: templateName.value.trim(),
+    mealType: templateMealType.value,
+    items: templateRecords.value,
+  })
+  showToast({ message: '已保存为常用餐', icon: 'success', duration: 1200 })
+}
+
+function openMealTemplatePicker(): void {
+  if (mealTemplates.length === 0) {
+    showToast('在已有餐次右侧点击书签图标，即可保存常用餐')
+    return
+  }
+  showMealTemplatePicker.value = true
+}
+
+function applySelectedMealTemplate(templateId: string): void {
+  const count = dietStore.applyMealTemplate(templateId, getTodayString())
+  showMealTemplatePicker.value = false
+  if (count > 0) showToast({ message: `已添加 ${count} 项常用餐记录`, icon: 'success', duration: 1200 })
+}
+
+async function removeMealTemplate(templateId: string): Promise<void> {
+  const template = mealTemplates.find(item => item.id === templateId)
+  if (!template) return
+  try {
+    await showConfirmDialog({
+      title: '删除常用餐',
+      message: `将删除“${template.name}”，不会影响已经记录的饮食。`,
+      confirmButtonText: '删除',
+    })
+    dietStore.deleteMealTemplate(templateId)
+    if (!mealTemplates.length) showMealTemplatePicker.value = false
+    showToast({ message: '已删除常用餐', icon: 'success', duration: 1000 })
+  } catch {
+    // Dialog cancellation is an expected user action.
+  }
+}
+
 async function copyYesterdayRecords(): Promise<void> {
   if (yesterdayRecords.value.length === 0) return
+  const yesterday = dayjs().subtract(1, 'day').format('YYYY-MM-DD')
 
   try {
     await showConfirmDialog({
@@ -705,11 +986,8 @@ async function copyYesterdayRecords(): Promise<void> {
       message: `将复制昨天的 ${yesterdayRecords.value.length} 条饮食记录到今天。`,
       confirmButtonText: '复制到今天',
     })
-    for (const record of yesterdayRecords.value) {
-      const { id: _id, date: _date, ...recordData } = record
-      addRecord({ ...recordData, date: getTodayString() })
-    }
-    showToast({ message: '已复制昨天记录', icon: 'success', duration: 1200 })
+    const count = dietStore.copyRecordsToDate(yesterday, getTodayString())
+    showToast({ message: `已复制 ${count} 条昨天记录`, icon: 'success', duration: 1200 })
   } catch {
     // Dialog cancellation is an expected user action.
   }
@@ -741,6 +1019,38 @@ function openLifestyleDialog(): void {
   showLifestyleDialog.value = true
 }
 
+function openCarePlanDialog(): void {
+  const plan = dietStore.personalCarePlan
+  carePlanSource.value = plan.source
+  carePlanReviewDate.value = plan.reviewDate || ''
+  carePlanNote.value = plan.note
+  carePlanTargets.protein = plan.targets?.protein
+  carePlanTargets.potassium = plan.targets?.potassium
+  carePlanTargets.phosphorus = plan.targets?.phosphorus
+  carePlanTargets.sodium = plan.targets?.sodium
+  showCarePlanDialog.value = true
+}
+
+function saveCarePlan(): void {
+  const normalizeTarget = (value: number | undefined, max: number): number | undefined =>
+    typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= max ? value : undefined
+  const targets: PersonalCarePlanTargets = {
+    protein: normalizeTarget(carePlanTargets.protein, 300),
+    potassium: normalizeTarget(carePlanTargets.potassium, 10000),
+    phosphorus: normalizeTarget(carePlanTargets.phosphorus, 5000),
+    sodium: normalizeTarget(carePlanTargets.sodium, 10000),
+  }
+  const hasTargets = Object.values(targets).some(value => value !== undefined)
+  dietStore.updatePersonalCarePlan({
+    enabled: Boolean(carePlanReviewDate.value || carePlanNote.value.trim() || (carePlanSource.value === 'clinician' && hasTargets)),
+    source: carePlanSource.value,
+    reviewDate: carePlanReviewDate.value || undefined,
+    note: carePlanNote.value.trim(),
+    targets: carePlanSource.value === 'clinician' && hasTargets ? targets : undefined,
+  })
+  showToast({ message: '已保存个人方案信息', icon: 'success', duration: 1200 })
+}
+
 function saveLifestyleProfile(): void {
   dietStore.updateLifestyleProfile({
     mealSource: lifestyleMealSource.value,
@@ -755,8 +1065,8 @@ function saveLifestyleProfile(): void {
 function saveWeight(): void {
   const w = weightInput.value
   if (w && w >= 30 && w <= 200) {
-    dietStore.setBodyWeight(w)
-    showToast({ message: `已按 ${w}kg 更新每日营养目标`, icon: 'success', duration: 1500 })
+    dietStore.recordBodyWeight(w)
+    showToast({ message: `已记录 ${w}kg 并更新每日营养目标`, icon: 'success', duration: 1500 })
   } else if (!w || w <= 0) {
     dietStore.setBodyWeight(null)
     weightInput.value = undefined
@@ -765,23 +1075,17 @@ function saveWeight(): void {
     showToast('请输入 30-200kg 之间的体重')
   }
 }
+
+function openWeightDialog(): void {
+  weightInput.value = dietStore.bodyWeight ?? undefined
+  showWeightDialog.value = true
+}
 </script>
 
 <style scoped>
 .home-view {
   padding-bottom: 70px;
   background: #f5f7fa;
-}
-
-/* 养生提示条 */
-.kidney-banner {
-  background: #fff7e6;
-  padding: 6px 14px;
-  font-size: 11px;
-  color: #b8860b;
-  text-align: center;
-  font-weight: 500;
-  margin-bottom: 2px;
 }
 
 /* ===== 内容区域 ===== */
@@ -1168,6 +1472,7 @@ function saveWeight(): void {
 .actions :deep(.van-button) { height: 44px; font-size: 14px; font-weight: 600; }
 .actions :deep(.van-button--plain) { color: #3b7864; border-color: #b9d9cb; background: #fff; }
 .action-shortcuts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.action-shortcuts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .action-shortcuts :deep(.van-button) { width: 100%; }
 
 /* ===== 记录列表 ===== */
@@ -1241,6 +1546,9 @@ function saveWeight(): void {
   font-weight: 500;
   flex-shrink: 0;
 }
+
+.meal-template-save { margin-left: 2px; color: #8ba297; cursor: pointer; }
+.template-dialog-hint { padding: 10px 16px 16px; color: #829089; font-size: 11px; line-height: 1.45; }
 
 .meal-count {
   font-size: 11px;
@@ -1353,6 +1661,16 @@ function saveWeight(): void {
   gap: 8px;
   padding: 0 16px 8px;
 }
+
+.meal-source-picker { padding: 2px 16px 10px; }
+.meal-source-picker > span { display: block; margin-bottom: 7px; color: #777; font-size: 12px; font-weight: 600; }
+.continue-meal-option { display: flex; flex-direction: column; gap: 5px; padding: 4px 16px 12px; }
+.continue-meal-option :deep(.van-checkbox__label) { color: #426258; font-size: 12px; }
+.continue-meal-option small { padding-left: 22px; color: #8a9892; font-size: 10px; line-height: 1.4; }
+.meal-source-options { display: flex; gap: 7px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.meal-source-options::-webkit-scrollbar { display: none; }
+.meal-source-options button { flex: 0 0 auto; padding: 5px 9px; color: #63736c; font: inherit; font-size: 11px; background: #f4f7f5; border: 1px solid #e0e8e3; border-radius: 6px; }
+.meal-source-options button.active { color: #fff; background: #237a64; border-color: #237a64; }
 
 .recent-foods {
   padding: 12px 16px 4px;
@@ -1555,6 +1873,26 @@ function saveWeight(): void {
   font-weight: 600;
 }
 
+.food-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-left: 8px;
+}
+
+.food-detail-sheet { padding: 4px 16px 22px; }
+.food-detail-meta { display: flex; align-items: center; gap: 8px; color: #71827b; font-size: 11px; }
+.food-detail-category { padding: 3px 7px; color: #237a64; background: #e8f4ef; border-radius: 5px; }
+.food-detail-serving { margin: 12px 0; color: #67756f; font-size: 12px; line-height: 1.5; }
+.food-detail-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
+.food-detail-nutrient { min-width: 0; padding: 9px 6px; text-align: center; background: #f6f8f7; border-radius: 7px; }
+.food-detail-nutrient strong { display: block; overflow: hidden; color: #293732; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.food-detail-nutrient span { display: block; margin-top: 3px; color: #89958f; font-size: 10px; }
+.food-detail-source { padding: 10px 0 14px; border-top: 1px solid #edf0ee; }
+.food-detail-source > span { color: #5a6c64; font-size: 12px; font-weight: 600; }
+.food-detail-source p { margin: 4px 0 0; color: #8a9691; font-size: 11px; line-height: 1.45; }
+.food-detail-sheet :deep(.van-button--primary) { background: #237a64; border-color: #237a64; }
+
 /* 体重弹窗提示 */
 .weight-dialog-hint {
   padding: 12px 16px;
@@ -1582,6 +1920,13 @@ function saveWeight(): void {
 .lifestyle-card { order: 5; }
 .records-section { order: 6; }
 
+.care-plan-card { order: 2; }
+.actions-primary { order: 3; }
+.meal-rhythm { order: 4; }
+.next-meal-card { order: 5; }
+.lifestyle-card { order: 6; }
+.records-section { order: 7; }
+
 .dashboard,
 .welcome-card {
   border: 1px solid #e6ebe8;
@@ -1604,6 +1949,23 @@ function saveWeight(): void {
 }
 
 .lifestyle-icon { color: #237a64; background: #e8f4ef; }
+
+.care-plan-card { display: flex; align-items: center; gap: 10px; padding: 11px 12px; margin-bottom: 14px; background: #fff9ef; border: 1px solid #f1ddba; border-radius: 10px; cursor: pointer; }
+.care-plan-card:active { background: #fff3de; }
+.care-plan-icon { display: grid; place-items: center; width: 32px; height: 32px; color: #b57a32; background: #fff0d5; border-radius: 8px; }
+.care-plan-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.care-plan-copy span { color: #624b2d; font-size: 14px; font-weight: 700; }
+.care-plan-copy small { overflow: hidden; color: #977957; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.care-plan-form { padding: 8px 16px 4px; }
+.care-plan-form > span { display: block; margin-bottom: 8px; color: #555; font-size: 13px; font-weight: 600; }
+.care-plan-options { display: flex; flex-wrap: wrap; gap: 10px 14px; padding-bottom: 8px; }
+.care-plan-target-title { margin-top: 8px; }
+.care-plan-targets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0 -16px 6px; border-top: 1px solid #f1eee9; border-left: 1px solid #f1eee9; }
+.care-plan-targets :deep(.van-cell) { min-width: 0; padding: 9px 8px; border-right: 1px solid #f1eee9; border-bottom: 1px solid #f1eee9; }
+.care-plan-targets :deep(.van-field__label) { width: 40px; margin-right: 3px; font-size: 12px; }
+.care-plan-targets :deep(.van-field__control) { min-width: 0; font-size: 12px; }
+.care-plan-targets :deep(.van-field__button) { font-size: 11px; }
+.care-plan-disclaimer { margin: 0; padding: 4px 16px 14px; color: #999; font-size: 11px; line-height: 1.5; }
 
 .next-meal-card {
   background: #eff8f2;
@@ -1628,4 +1990,47 @@ function saveWeight(): void {
 .dot-breakfast { background: #e9a84c; }
 .nutrition-preview { background: #edf8f2; }
 .preview-title { color: #237a64; }
+
+.daily-review {
+  margin-bottom: 14px;
+  padding: 14px;
+  background: #fff;
+  border: 1px solid #dce9e4;
+  border-radius: 10px;
+}
+
+.daily-review.review-attention { border-color: #f0c8c8; background: #fffafa; }
+.daily-review.review-watch { border-color: #eedfbd; background: #fffdf8; }
+.daily-review-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.daily-review-heading > div { display: flex; flex-direction: column; gap: 2px; }
+.daily-review-heading span { color: #273d37; font-size: 14px; font-weight: 700; }
+.daily-review-heading small { color: #81908b; font-size: 11px; }
+.daily-review > strong { display: block; color: #2b3d38; font-size: 15px; }
+.daily-review > p { margin: 5px 0 10px; color: #62736d; font-size: 12px; line-height: 1.5; }
+.review-quality { flex: 0 0 auto; padding: 3px 7px; border-radius: 4px; background: #f0f3f2; color: #75827e !important; font-size: 10px !important; font-weight: 600 !important; }
+.review-quality.quality-good { color: #26745f !important; background: #e8f5ee; }
+.review-quality.quality-watch { color: #9b6a23 !important; background: #fff2d8; }
+.review-items { display: grid; gap: 7px; }
+.review-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 9px; background: #f7faf8; border-radius: 6px; }
+.review-item > div { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.review-item span { color: #3e504b; font-size: 12px; font-weight: 600; }
+.review-item small { color: #84918d; font-size: 10px; }
+.review-item > strong { color: #2c4f45; font-size: 13px; white-space: nowrap; }
+.review-item.item-attention { background: #fff0f0; }
+.review-item.item-attention > strong { color: #bd4a4a; }
+.review-item.item-watch { background: #fff8eb; }
+.review-item.item-watch > strong { color: #a87024; }
+.review-data-detail, .review-disclaimer { display: block; color: #81908b; font-size: 11px; line-height: 1.5; }
+.review-data-detail { margin-top: 9px; }
+.review-disclaimer { margin-top: 10px; padding-top: 9px; border-top: 1px dashed #deded8; color: #8a7c6b; }
+
+.template-picker-list { padding: 4px 16px 14px; }
+.template-picker-item { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 0; text-align: left; font: inherit; background: transparent; border: 0; border-bottom: 1px solid #edf0ee; }
+.template-picker-item:last-child { border-bottom: 0; }
+.template-picker-item:active { background: #f5f8f6; }
+.template-picker-copy { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.template-picker-copy strong { overflow: hidden; color: #31443d; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.template-picker-copy small { color: #899790; font-size: 11px; }
+.template-picker-actions { display: flex; align-items: center; gap: 14px; color: #9aa7a1; }
+.template-picker-actions .van-icon:last-child { color: #c88b8b; }
 </style>

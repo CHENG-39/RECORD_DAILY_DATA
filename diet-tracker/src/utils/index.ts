@@ -1,5 +1,5 @@
 import dayjs from 'dayjs'
-import type { FoodRecord, DailyNutrition, NutritionStatus, NutritionGoals, FoodDefinition } from '@/types'
+import type { FoodRecord, DailyNutrition, NutritionStatus, NutritionGoals, FoodDefinition, LifestyleProfile, MealTemplate, PersonalCarePlan, SuggestionFeedback, WeightRecord } from '@/types'
 import { RECOMMENDED_NUTRITION } from '@/constants/recommended'
 
 
@@ -335,12 +335,44 @@ export function getNutrientSafeRanges(
   }
 }
 
+/**
+ * Applies daily upper limits recorded from an existing clinician plan. This does
+ * not create medical targets; it only changes display and comparison thresholds.
+ */
+export function getPersonalizedNutrientRanges(
+  weightKg: number,
+  mode: 'normal' | 'kidney',
+  plan?: PersonalCarePlan
+) {
+  const ranges = getNutrientSafeRanges(weightKg, mode)
+  if (mode !== 'kidney' || !plan?.enabled || plan.source !== 'clinician' || !plan.targets) return ranges
+
+  const next = Object.fromEntries(Object.entries(ranges).map(([key, range]) => [key, { ...range }])) as typeof ranges
+  const targetKeys = ['protein', 'potassium', 'phosphorus', 'sodium'] as const
+  for (const key of targetKeys) {
+    const target = plan.targets[key]
+    if (typeof target !== 'number' || !Number.isFinite(target) || target <= 0) continue
+    const value = key === 'protein' ? Math.round(target * 10) / 10 : Math.round(target)
+    next[key] = { ...next[key], min: 0, max: value, isUpperLimit: true, label: `≤${value}${next[key].unit}` }
+  }
+  return next
+}
+
 // ========== Data Export ==========
 
 export function exportRecordsAsJSON(data: {
+  backupFormatVersion?: number
   records: FoodRecord[]
   goals: NutritionGoals
+  userMode?: 'normal' | 'kidney'
+  bodyWeight?: number | null
+  weightRecords?: WeightRecord[]
   customFoods?: FoodDefinition[]
+  lifestyleProfile?: LifestyleProfile
+  mealTemplates?: MealTemplate[]
+  suggestionFeedback?: SuggestionFeedback[]
+  personalCarePlan?: PersonalCarePlan
+  foodDatabaseVersion?: string
   exportDate: string
 }): void {
   const json = JSON.stringify(data, null, 2)

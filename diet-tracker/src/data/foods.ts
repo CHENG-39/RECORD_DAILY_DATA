@@ -1,5 +1,12 @@
 import type { FoodDefinition } from '@/types'
 
+export const FOOD_DATABASE_RELEASE = {
+  version: '2026.07.0',
+  verifiedAt: '2026-07-20',
+  primarySource: 'USDA FoodData Central',
+  policy: 'Single ingredients use traceable reference data; packaged foods use their own label; composite dishes remain estimates.',
+} as const
+
 /**
  * 内置食物数据库 — 基于 USDA FoodData Central / SR Legacy 标准参考数据
  *
@@ -2726,6 +2733,8 @@ export const BUILT_IN_FOODS: FoodDefinition[] = [
     dataSource: 'USDA FoodData Central',
     sourceReference: 'FDC 2080646, accessed 2026-07-20',
     dataConfidence: 'reference',
+    dataVersion: 'FDC record 2080646',
+    verifiedAt: '2026-07-20',
   },
   {
     // USDA FDC #2707442 Soy sauce, Survey (FNDDS)
@@ -2745,6 +2754,8 @@ export const BUILT_IN_FOODS: FoodDefinition[] = [
     dataSource: 'USDA FoodData Central',
     sourceReference: 'FDC 2707442, accessed 2026-07-20',
     dataConfidence: 'reference',
+    dataVersion: 'FNDDS 2021-2022, published 2024-10-31',
+    verifiedAt: '2026-07-20',
   },
   {
     // USDA FDC #2099815 Vegetable oil, branded reference record
@@ -2764,6 +2775,8 @@ export const BUILT_IN_FOODS: FoodDefinition[] = [
     dataSource: 'USDA FoodData Central',
     sourceReference: 'FDC 2099815, accessed 2026-07-20',
     dataConfidence: 'label',
+    dataVersion: 'FDC record 2099815',
+    verifiedAt: '2026-07-20',
   },
   {
     // USDA FDC #2076456 Granulated sugar, branded reference record
@@ -2783,6 +2796,8 @@ export const BUILT_IN_FOODS: FoodDefinition[] = [
     dataSource: 'USDA FoodData Central',
     sourceReference: 'FDC 2076456, accessed 2026-07-20',
     dataConfidence: 'label',
+    dataVersion: 'FDC record 2076456',
+    verifiedAt: '2026-07-20',
   },
 ]
 
@@ -2800,6 +2815,7 @@ export const FOOD_CATEGORIES = [
   '豆制品',
   '乳制品',
   '调味料',
+  '包装食品',
 ] as const
 
 export type FoodCategory = (typeof FOOD_CATEGORIES)[number]

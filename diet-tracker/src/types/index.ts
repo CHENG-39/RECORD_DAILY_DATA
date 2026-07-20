@@ -15,6 +15,7 @@ export interface FoodRecord {
   sodium: number
   bioavailablePhosphorus: number // 生物可利用磷（mg）— 实际进入血液需肾脏过滤的磷
   mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack'
+  source?: MealSource
   date: string           // 日期 YYYY-MM-DD
 }
 
@@ -44,6 +45,12 @@ export interface NutritionGoals {
   sodium: number
 }
 
+export interface WeightRecord {
+  id: string
+  date: string
+  weight: number
+}
+
 // ========== 自定义食物定义 ==========
 
 export interface FoodDefinition {
@@ -65,6 +72,8 @@ export interface FoodDefinition {
   dataSource?: string
   sourceReference?: string
   dataConfidence?: FoodDataConfidence
+  dataVersion?: string
+  verifiedAt?: string
 }
 
 export type FoodDataConfidence = 'reference' | 'label' | 'estimate' | 'user'
@@ -82,6 +91,28 @@ export interface LifestyleProfile {
   cookingAccess: CookingAccess
   priority: LifestylePriority
   configured: boolean
+}
+
+export interface MealTemplate {
+  id: string
+  name: string
+  mealType: FoodRecord['mealType']
+  items: Array<Omit<FoodRecord, 'id' | 'date'>>
+}
+
+export interface PersonalCarePlanTargets {
+  protein?: number
+  potassium?: number
+  phosphorus?: number
+  sodium?: number
+}
+
+export interface PersonalCarePlan {
+  enabled: boolean
+  source: 'clinician' | 'self'
+  reviewDate?: string
+  note: string
+  targets?: PersonalCarePlanTargets
 }
 
 export type SuggestionResponse = 'doable' | 'alternate_requested'
