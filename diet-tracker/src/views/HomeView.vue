@@ -40,7 +40,10 @@
 
       <div v-else class="dashboard">
         <div class="dashboard-header">
-          <span></span>
+          <div class="dashboard-heading">
+            <span>今日营养进度</span>
+            <small>已记录 {{ todayRecords.length }} 项</small>
+          </div>
           <van-icon
             v-if="dietStore.userMode === 'kidney'"
             name="question-o"
@@ -169,6 +172,14 @@
         <van-button type="primary" block round @click="openAddDialog">
           <van-icon name="add-o" /> 添加饮食记录
         </van-button>
+        <div class="action-shortcuts">
+          <van-button plain @click="copyYesterdayRecords" :disabled="yesterdayRecords.length === 0">
+            <van-icon name="replay" /> 复用昨天
+          </van-button>
+          <van-button plain @click="router.push('/foods')">
+            <van-icon name="search" /> 浏览食物库
+          </van-button>
+        </div>
       </div>
 
       <!-- ===== 今日记录（按餐次分组） ===== -->
@@ -222,6 +233,19 @@
       show-cancel-button
       :before-close="handleBeforeClose"
     >
+      <div v-if="recentFoods.length" class="recent-foods">
+        <span class="recent-foods-label">最近记录</span>
+        <div class="recent-food-chips">
+          <button
+            v-for="food in recentFoods"
+            :key="food.id"
+            type="button"
+            class="recent-food-chip"
+            :class="{ active: inputFood?.id === food.id }"
+            @click="onFoodSelect(food)"
+          >{{ food.name }}</button>
+        </div>
+      </div>
       <van-field
         :model-value="selectedFoodLabel"
         label="食物"
@@ -369,6 +393,8 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import dayjs from 'dayjs'
 import type { FoodRecord, FoodDefinition, MealSource, CookingAccess, LifestylePriority } from '@/types'
 import { useDietStore } from '@/stores/diet'
 import { MEAL_TYPES } from '@/constants'
@@ -380,10 +406,11 @@ import { useNextMealSuggestion } from '@/composables/useNextMealSuggestion'
 import NavBar from '@/components/NavBar.vue'
 import TabBar from '@/components/TabBar.vue'
 import GlossarySheet from '@/components/GlossarySheet.vue'
-import { showToast } from 'vant'
+import { showConfirmDialog, showToast } from 'vant'
 
 const dietStore = useDietStore()
-const { todayRecords, todayNutrition, allFoods, addRecord, updateRecord, deleteRecord } = dietStore
+const router = useRouter()
+const { records, todayRecords, todayNutrition, allFoods, addRecord, updateRecord, deleteRecord } = dietStore
 
 const isNewUser = computed(() => !dietStore.bodyWeight && todayRecords.length === 0)
 
@@ -491,6 +518,25 @@ function getActualWeight(): number | null {
 }
 
 const categoryChips = [...FOOD_CATEGORIES]
+
+const recentFoods = computed(() => {
+  const seen = new Set<string>()
+  const result: FoodDefinition[] = []
+  for (const record of [...records].reverse()) {
+    if (seen.has(record.foodType)) continue
+    const food = allFoods.find(item => item.id === record.foodType || item.name === record.foodName)
+    if (!food) continue
+    seen.add(record.foodType)
+    result.push(food)
+    if (result.length === 6) break
+  }
+  return result
+})
+
+const yesterdayRecords = computed(() => {
+  const yesterday = dayjs().subtract(1, 'day').format('YYYY-MM-DD')
+  return records.filter(record => record.date === yesterday)
+})
 
 const filteredFoods = computed(() => {
   const keyword = foodSearchText.value.trim().toLowerCase()
@@ -608,6 +654,25 @@ function handleBeforeClose(action: string): boolean {
 
 function handleDelete(id: string): void { deleteRecord(id) }
 
+async function copyYesterdayRecords(): Promise<void> {
+  if (yesterdayRecords.value.length === 0) return
+
+  try {
+    await showConfirmDialog({
+      title: '复用昨天记录',
+      message: `将复制昨天的 ${yesterdayRecords.value.length} 条饮食记录到今天。`,
+      confirmButtonText: '复制到今天',
+    })
+    for (const record of yesterdayRecords.value) {
+      const { id: _id, date: _date, ...recordData } = record
+      addRecord({ ...recordData, date: getTodayString() })
+    }
+    showToast({ message: '已复制昨天记录', icon: 'success', duration: 1200 })
+  } catch {
+    // Dialog cancellation is an expected user action.
+  }
+}
+
 function markSuggestionDoable(): void {
   dietStore.recordSuggestionFeedback({
     date: getTodayString(),
@@ -668,7 +733,7 @@ function saveWeight(): void {
 
 /* 养生提示条 */
 .kidney-banner {
-  background: linear-gradient(135deg, #fff7e6, #fef0d0);
+  background: #fff7e6;
   padding: 6px 14px;
   font-size: 11px;
   color: #b8860b;
@@ -685,7 +750,7 @@ function saveWeight(): void {
 /* ===== 仪表盘 ===== */
 .dashboard {
   background: #fff;
-  border-radius: 14px;
+  border-radius: 8px;
   padding: 20px 16px 16px;
   margin-bottom: 14px;
   box-shadow: 0 1px 6px rgba(0,0,0,0.04);
@@ -695,8 +760,12 @@ function saveWeight(): void {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: -8px;
+  margin-bottom: 2px;
 }
+
+.dashboard-heading { display: flex; flex-direction: column; gap: 2px; }
+.dashboard-heading span { color: #333; font-size: 14px; font-weight: 700; }
+.dashboard-heading small { color: #999; font-size: 11px; }
 
 .glossary-btn {
   padding: 4px;
@@ -708,7 +777,7 @@ function saveWeight(): void {
 /* 首次使用引导卡 */
 .welcome-card {
   background: #fff;
-  border-radius: 14px;
+  border-radius: 8px;
   padding: 24px 16px;
   margin-bottom: 14px;
   box-shadow: 0 1px 6px rgba(0,0,0,0.04);
@@ -749,7 +818,7 @@ function saveWeight(): void {
   padding: 12px 14px;
   margin-bottom: 14px;
   background: #fff;
-  border-radius: 10px;
+  border-radius: 8px;
   cursor: pointer;
 }
 
@@ -786,7 +855,7 @@ function saveWeight(): void {
   color: #254b42;
   background: #edf8f2;
   border: 1px solid #ccebd9;
-  border-radius: 10px;
+  border-radius: 8px;
 }
 
 .next-meal-heading { display: flex; justify-content: space-between; margin-bottom: 8px; color: #45836a; font-size: 11px; }
@@ -968,7 +1037,7 @@ function saveWeight(): void {
 /* 可展开次要指标 */
 .more-metrics {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   padding-top: 12px;
   margin-top: 8px;
@@ -979,7 +1048,7 @@ function saveWeight(): void {
   text-align: center;
   padding: 10px 4px;
   background: #f8fafb;
-  border-radius: 10px;
+  border-radius: 8px;
   transition: background 0.2s;
 }
 
@@ -1027,6 +1096,11 @@ function saveWeight(): void {
   gap: 8px;
   margin-bottom: 16px;
 }
+
+.actions :deep(.van-button) { height: 44px; font-size: 14px; font-weight: 600; }
+.actions :deep(.van-button--plain) { color: #3b7864; border-color: #b9d9cb; background: #fff; }
+.action-shortcuts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.action-shortcuts :deep(.van-button) { width: 100%; }
 
 /* ===== 记录列表 ===== */
 .records-section {
@@ -1211,6 +1285,46 @@ function saveWeight(): void {
   gap: 8px;
   padding: 0 16px 8px;
 }
+
+.recent-foods {
+  padding: 12px 16px 4px;
+  border-bottom: 1px solid #f3f5f7;
+}
+
+.recent-foods-label {
+  display: block;
+  margin-bottom: 8px;
+  color: #777;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.recent-food-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scrollbar-width: none;
+}
+
+.recent-food-chips::-webkit-scrollbar { display: none; }
+
+.recent-food-chip {
+  flex: 0 0 auto;
+  max-width: 130px;
+  overflow: hidden;
+  padding: 6px 10px;
+  color: #456d60;
+  font: inherit;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: #f1f8f4;
+  border: 1px solid #cce4d6;
+  border-radius: 6px;
+}
+
+.recent-food-chip.active { color: #fff; background: #3b7864; border-color: #3b7864; }
 
 .qw-btn {
   flex: 1;
