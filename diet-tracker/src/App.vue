@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { RouterView } from 'vue-router'
 import { onMounted, ref } from 'vue'
+import AppUpdatePrompt from '@/components/AppUpdatePrompt.vue'
 
 // 延迟 hydration：让 Service Worker 先激活，骨架屏先渲染
 const ready = ref(false)
@@ -30,6 +31,7 @@ onMounted(() => {
       </Suspense>
     </template>
   </RouterView>
+  <AppUpdatePrompt />
 </template>
 
 <style>

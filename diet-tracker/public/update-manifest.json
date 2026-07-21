@@ -1,0 +1,12 @@
+{
+  "versionCode": 3,
+  "versionName": "1.1.1",
+  "mandatory": false,
+  "publishedAt": "2026-07-21T00:00:00Z",
+  "releaseNotes": [
+    "修复 Android 顶部状态栏遮挡模式切换按钮的问题",
+    "新增安全的应用内更新检查与安装流程"
+  ],
+  "apkUrl": "",
+  "sha256": ""
+}

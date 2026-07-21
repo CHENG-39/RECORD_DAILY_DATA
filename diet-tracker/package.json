@@ -10,6 +10,7 @@
     "cap:sync": "npm run build:android && cap sync android",
     "cap:open": "cap open android",
     "android:apk": "powershell -ExecutionPolicy Bypass -File scripts/build-android.ps1",
+    "android:update-manifest": "node scripts/create-update-manifest.mjs",
     "android:sdk": "powershell -ExecutionPolicy Bypass -File scripts/setup-android-sdk.ps1",
     "preview": "vite preview",
     "test": "vitest run",
