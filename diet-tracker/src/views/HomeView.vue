@@ -187,6 +187,29 @@
         </div>
       </div>
 
+      <section v-if="frequentFoodRecords.length" class="quick-log" aria-label="常吃食物快捷记录">
+        <div class="quick-log-header">
+          <div>
+            <span>常吃食物</span>
+            <small>按上次份量记入当前餐次</small>
+          </div>
+          <span class="streak-status" :class="{ pending: !recordStreak.loggedToday }">{{ streakLabel }}</span>
+        </div>
+        <div class="quick-log-list">
+          <button
+            v-for="item in frequentFoodRecords"
+            :key="item.key"
+            type="button"
+            class="quick-log-item"
+            @click="quickAddFrequentFood(item.record)"
+          >
+            <span>{{ item.record.foodName }}</span>
+            <small>{{ formatRecordWeight(item.record) }}</small>
+            <van-icon name="add-o" size="15" />
+          </button>
+        </div>
+      </section>
+
       <div class="lifestyle-card" @click="openLifestyleDialog">
         <div class="lifestyle-icon"><van-icon name="friends-o" size="20" /></div>
         <div class="lifestyle-copy">
@@ -553,7 +576,7 @@ import dayjs from 'dayjs'
 import type { FoodRecord, FoodDefinition, MealSource, CookingAccess, LifestylePriority, PersonalCarePlan, PersonalCarePlanTargets } from '@/types'
 import { useDietStore } from '@/stores/diet'
 import { MEAL_TYPES } from '@/constants'
-import { getTodayString, formatWeight, getCurrentMealType, calculatePRAL, getPRALStatus } from '@/utils'
+import { getTodayString, formatWeight, getCurrentMealType, calculatePRAL, getPRALStatus, getRecordStreak } from '@/utils'
 import { calculateNutritionFromDefinition } from '@/constants/nutrition'
 import { getPotassiumRisk, getPhosphorusRisk, getPtoProteinRatio, getPtoProteinLevel, getPhosphorusBioavailability, FOOD_CATEGORIES } from '@/data/foods'
 import { useDashboardMetrics } from '@/composables/useDashboardMetrics'
@@ -613,6 +636,14 @@ const mealRhythm = computed(() => {
       calories: Math.round(mealRecords.reduce((sum, record) => sum + record.calories, 0)),
     }
   })
+})
+
+const recordStreak = computed(() => getRecordStreak(records))
+const streakLabel = computed(() => {
+  if (recordStreak.value.days === 0) return '今天开始'
+  return recordStreak.value.loggedToday
+    ? `连续 ${recordStreak.value.days} 天`
+    : `已连续 ${recordStreak.value.days} 天`
 })
 
 // ========== 添加/编辑记录 ==========
@@ -709,6 +740,26 @@ const recentFoods = computed(() => {
     if (result.length === 6) break
   }
   return result
+})
+
+const frequentFoodRecords = computed(() => {
+  const grouped = new Map<string, { key: string; record: FoodRecord; count: number; lastDate: string }>()
+  for (const record of records) {
+    const key = `${record.foodType}|${record.weight}|${record.source ?? ''}`
+    const current = grouped.get(key)
+    if (!current) {
+      grouped.set(key, { key, record, count: 1, lastDate: record.date })
+      continue
+    }
+    current.count += 1
+    if (record.date >= current.lastDate) {
+      current.record = record
+      current.lastDate = record.date
+    }
+  }
+  return [...grouped.values()]
+    .sort((a, b) => b.count - a.count || b.lastDate.localeCompare(a.lastDate))
+    .slice(0, 6)
 })
 
 const yesterdayRecords = computed(() => {
@@ -814,6 +865,18 @@ function openAddForMeal(mealType: FoodRecord['mealType']): void {
   openAddDialog()
   inputMealType.value = mealType
   isAutoMeal.value = false
+}
+
+function quickAddFrequentFood(record: FoodRecord): void {
+  const { id: _id, date: _date, mealType: _mealType, ...recordData } = record
+  const mealType = getCurrentMealType()
+  addRecord({
+    ...recordData,
+    mealType,
+    source: record.source ?? dietStore.lifestyleProfile.mealSource,
+    date: getTodayString(),
+  })
+  showToast({ message: `已记入${MEAL_TYPES[mealType]}：${record.foodName}`, icon: 'success', duration: 1100 })
 }
 
 function openEditDialog(record: FoodRecord): void {
@@ -1940,6 +2003,29 @@ function openWeightDialog(): void {
 .actions :deep(.van-button) { height: 44px; font-size: 14px; font-weight: 650; }
 .actions :deep(.van-button--primary) { background: #237a64; border-color: #237a64; }
 .actions :deep(.van-button--plain) { color: #2e6e5c; background: #fff; border-color: #b9d9cb; }
+
+.quick-log {
+  order: 4;
+  margin-bottom: 14px;
+  padding: 13px;
+  background: #fff;
+  border: 1px solid #e2ebe6;
+  border-radius: 10px;
+}
+
+.quick-log-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.quick-log-header > div { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.quick-log-header span:first-child { color: #29463c; font-size: 14px; font-weight: 700; }
+.quick-log-header small { color: #84938d; font-size: 11px; }
+.streak-status { flex: 0 0 auto; padding: 3px 7px; color: #29745f; background: #e8f5ee; border-radius: 5px; font-size: 10px !important; font-weight: 700 !important; }
+.streak-status.pending { color: #9b6b28; background: #fff3df; }
+.quick-log-list { display: flex; gap: 7px; overflow-x: auto; padding-bottom: 1px; scrollbar-width: none; }
+.quick-log-list::-webkit-scrollbar { display: none; }
+.quick-log-item { display: grid; grid-template-columns: auto auto; min-width: 110px; gap: 2px 7px; padding: 9px 10px; color: #3c5048; text-align: left; font: inherit; background: #f6faf8; border: 1px solid #dce9e3; border-radius: 7px; }
+.quick-log-item:active { background: #edf7f1; border-color: #9dc9b5; transform: translateY(1px); }
+.quick-log-item span { overflow: hidden; color: #30473e; font-size: 12px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.quick-log-item small { color: #84938d; font-size: 10px; }
+.quick-log-item :deep(.van-icon) { grid-row: span 2; align-self: center; color: #2d8066; }
 
 .lifestyle-card {
   margin-bottom: 14px;

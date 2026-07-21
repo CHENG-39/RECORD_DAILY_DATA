@@ -27,6 +27,28 @@ export function getCurrentMealType(): 'breakfast' | 'lunch' | 'dinner' | 'snack'
   return 'snack'
 }
 
+/**
+ * Counts consecutive calendar days with at least one logged food record.
+ * A day is not treated as broken merely because the user has not logged today's meal yet.
+ */
+export function getRecordStreak(
+  records: Array<Pick<FoodRecord, 'date'>>,
+  referenceDate = getTodayString()
+): { days: number; loggedToday: boolean } {
+  const validDate = /^\d{4}-\d{2}-\d{2}$/
+  const loggedDates = new Set(records.map(record => record.date).filter(date => validDate.test(date)))
+  const loggedToday = loggedDates.has(referenceDate)
+  let cursor = dayjs(referenceDate)
+  if (!loggedToday) cursor = cursor.subtract(1, 'day')
+
+  let days = 0
+  while (loggedDates.has(cursor.format('YYYY-MM-DD'))) {
+    days += 1
+    cursor = cursor.subtract(1, 'day')
+  }
+  return { days, loggedToday }
+}
+
 // ========== Nutrition Totals ==========
 
 export function calculateNutritionTotals(records: Array<{

@@ -1,5 +1,25 @@
 import { describe, expect, it } from 'vitest'
-import { calculateNutritionTotals, getPersonalizedNutrientRanges } from './index'
+import { calculateNutritionTotals, getPersonalizedNutrientRanges, getRecordStreak } from './index'
+
+describe('getRecordStreak', () => {
+  it('counts through today when the user has already recorded a meal', () => {
+    expect(getRecordStreak([
+      { date: '2026-07-19' }, { date: '2026-07-20' }, { date: '2026-07-21' },
+    ], '2026-07-21')).toEqual({ days: 3, loggedToday: true })
+  })
+
+  it('keeps yesterday\'s streak visible until the user records today', () => {
+    expect(getRecordStreak([
+      { date: '2026-07-19' }, { date: '2026-07-20' },
+    ], '2026-07-21')).toEqual({ days: 2, loggedToday: false })
+  })
+
+  it('stops at a missing calendar day', () => {
+    expect(getRecordStreak([
+      { date: '2026-07-17' }, { date: '2026-07-19' }, { date: '2026-07-20' },
+    ], '2026-07-21')).toEqual({ days: 2, loggedToday: false })
+  })
+})
 
 describe('calculateNutritionTotals', () => {
   it('aggregates sodium and bioavailable phosphorus with the other nutrients', () => {

@@ -33,7 +33,7 @@
 
 Android 包位于 `diet-tracker/android/app/build/outputs/apk/`。将 APK 复制到手机后，允许当前文件管理器“安装未知应用”即可安装。
 
-**正式安装包下载：** [Diet Tracker v1.1.1 for Android](https://cheng-39.github.io/RECORD_DAILY_DATA/downloads/diet-tracker-v1.1.1.apk)
+**正式安装包下载：** [Diet Tracker v1.1.2 for Android](https://cheng-39.github.io/RECORD_DAILY_DATA/downloads/diet-tracker-v1.1.2.apk)
 
 应用启动时会检查 GitHub Pages 上的更新清单。发现新版本后，客户端会展示更新说明、通过 HTTPS 下载 APK、校验 SHA-256，并交由 Android 系统安装页完成更新。系统要求用户确认安装权限，该确认不会被应用绕过。
 

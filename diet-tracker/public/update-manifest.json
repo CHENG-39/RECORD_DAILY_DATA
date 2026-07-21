@@ -1,11 +1,12 @@
 {
-  "versionCode": 3,
-  "versionName": "1.1.1",
+  "versionCode": 4,
+  "versionName": "1.1.2",
   "mandatory": false,
-  "publishedAt": "2026-07-21T01:09:21.168Z",
+  "publishedAt": "2026-07-21T01:34:40.947Z",
   "releaseNotes": [
-    "体验与稳定性优化"
+    "新增常吃食物一键记录，按上次份量快速记入当前餐次",
+    "新增连续记录反馈，今天尚未记录时不会中断已有节奏"
   ],
-  "apkUrl": "https://cheng-39.github.io/RECORD_DAILY_DATA/downloads/diet-tracker-v1.1.1.apk",
-  "sha256": "11d9a5a87e3e00e380a347aa591e608fb0e45aa0b8dab9f0415e6d87ad08d86d"
+  "apkUrl": "https://cheng-39.github.io/RECORD_DAILY_DATA/downloads/diet-tracker-v1.1.2.apk",
+  "sha256": "a0bdd466e042a1109bec41dd068682f9ada35f07ad52d5807ae063d0fc6924ea"
 }
