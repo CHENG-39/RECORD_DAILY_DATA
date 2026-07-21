@@ -2,11 +2,10 @@
   "versionCode": 3,
   "versionName": "1.1.1",
   "mandatory": false,
-  "publishedAt": "2026-07-21T00:00:00Z",
+  "publishedAt": "2026-07-21T01:09:21.168Z",
   "releaseNotes": [
-    "修复 Android 顶部状态栏遮挡模式切换按钮的问题",
-    "新增安全的应用内更新检查与安装流程"
+    "体验与稳定性优化"
   ],
-  "apkUrl": "",
-  "sha256": ""
+  "apkUrl": "https://cheng-39.github.io/RECORD_DAILY_DATA/downloads/diet-tracker-v1.1.1.apk",
+  "sha256": "11d9a5a87e3e00e380a347aa591e608fb0e45aa0b8dab9f0415e6d87ad08d86d"
 }

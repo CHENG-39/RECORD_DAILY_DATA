@@ -1,8 +1,29 @@
 apply plugin: 'com.android.application'
 
+def releaseSigningProperties = new Properties()
+def releaseSigningPropertiesPath = System.getenv('DIET_TRACKER_SIGNING_PROPERTIES')
+def releaseSigningPropertiesFile = releaseSigningPropertiesPath
+    ? file(releaseSigningPropertiesPath)
+    : rootProject.file('release-signing.properties')
+def hasReleaseSigning = releaseSigningPropertiesFile.exists()
+
+if (hasReleaseSigning) {
+    releaseSigningPropertiesFile.withReader('UTF-8') { releaseSigningProperties.load(it) }
+}
+
 android {
     namespace = "com.recorddailydata.diettracker"
     compileSdk = rootProject.ext.compileSdkVersion
+    signingConfigs {
+        release {
+            if (hasReleaseSigning) {
+                storeFile file(releaseSigningProperties['storeFile'])
+                storePassword releaseSigningProperties['storePassword']
+                keyAlias releaseSigningProperties['keyAlias']
+                keyPassword releaseSigningProperties['keyPassword']
+            }
+        }
+    }
     defaultConfig {
         applicationId "com.recorddailydata.diettracker"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -20,6 +41,9 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }
