@@ -155,7 +155,7 @@
           </div>
         </div>
         <small class="review-data-detail">{{ dataQuality.detail }}</small>
-        <small v-if="dietStore.userMode === 'kidney'" class="review-disclaimer">肾脏相关指标仅基于已记录饮食估算，不能替代医嘱、血液检查或处方。</small>
+        <small v-if="dietStore.userMode === 'kidney'" class="review-disclaimer">慢病管理指标仅基于已记录饮食估算，不能替代医嘱、检查结果或处方。</small>
       </section>
 
       <div v-if="dietStore.userMode === 'kidney'" class="care-plan-card" @click="openCarePlanDialog">
@@ -164,6 +164,7 @@
           <span>个人方案</span>
           <small>{{ carePlanSummary }}</small>
         </div>
+        <span v-if="carePlanReviewStatus" class="care-plan-review" :class="carePlanReviewStatus.level">{{ carePlanReviewStatus.label }}</span>
         <van-icon name="arrow" size="15" color="#9b8b70" />
       </div>
 
@@ -701,6 +702,15 @@ const carePlanSummary = computed(() => {
   const targetCount = plan.targets ? Object.values(plan.targets).filter(value => typeof value === 'number' && value > 0).length : 0
   const targetText = targetCount ? ` · ${targetCount} 项目标` : ''
   return plan.reviewDate ? `${source}${targetText} · ${plan.reviewDate} 复核` : `${source}${targetText}`
+})
+
+const carePlanReviewStatus = computed(() => {
+  const reviewDate = dietStore.personalCarePlan.reviewDate
+  if (!dietStore.personalCarePlan.enabled || !reviewDate || !dayjs(reviewDate).isValid()) return null
+  const daysUntilReview = dayjs(reviewDate).diff(dayjs().startOf('day'), 'day')
+  if (daysUntilReview < 0) return { label: '建议复核', level: 'overdue' }
+  if (daysUntilReview <= 14) return { label: `${daysUntilReview}天后复核`, level: 'due-soon' }
+  return null
 })
 
 const isCountFood = computed(() => inputFood.value?.unit === '1个')
@@ -2042,6 +2052,9 @@ function openWeightDialog(): void {
 .care-plan-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .care-plan-copy span { color: #624b2d; font-size: 14px; font-weight: 700; }
 .care-plan-copy small { overflow: hidden; color: #977957; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.care-plan-review { flex: 0 0 auto; padding: 3px 6px; border-radius: 5px; font-size: 10px; font-weight: 700; white-space: nowrap; }
+.care-plan-review.overdue { color: #a35d25; background: #fff0d8; }
+.care-plan-review.due-soon { color: #7b6b3d; background: #fff7de; }
 .care-plan-form { padding: 8px 16px 4px; }
 .care-plan-form > span { display: block; margin-bottom: 8px; color: #555; font-size: 13px; font-weight: 600; }
 .care-plan-options { display: flex; flex-wrap: wrap; gap: 10px 14px; padding-bottom: 8px; }

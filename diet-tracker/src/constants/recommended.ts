@@ -51,7 +51,7 @@ export const USER_MODE_CONFIG: Record<
     description: '基于 WHO/FAO 健康膳食指南的标准营养推荐',
   },
   kidney: {
-    label: '养生 (低钾低磷)',
-    description: '基于 KDIGO 2024 指南，精细化钾/磷摄入管理',
+    label: '慢病管理（钾、磷、钠关注）',
+    description: '提供营养记录提示；个人目标应以医生或营养师方案为准',
   },
 }

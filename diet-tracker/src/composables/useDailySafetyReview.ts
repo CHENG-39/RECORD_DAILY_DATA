@@ -68,7 +68,7 @@ export function useDailySafetyReview() {
     if (isKidney) {
       addUpperLimit('potassium', '钾', nutrition.totalPotassium, target.potassium.max, 'mg', '已超过当前个人参考上限，请以既有医嘱和化验结果为准。')
       addUpperLimit('bioavailable-phosphorus', '可利用磷', nutrition.totalBioavailablePhosphorus, target.phosphorus.max, 'mg', '可利用磷估算已超出参考上限；本指标用于识别记录中的磷负担，不替代血磷检查。')
-      addUpperLimit('protein', '蛋白质', nutrition.totalProtein, target.protein.max, 'g', '蛋白质已超过当前参考区间；肾脏相关目标必须由医生或营养师结合分期与治疗方式个体化确认。')
+      addUpperLimit('protein', '蛋白质', nutrition.totalProtein, target.protein.max, 'g', '蛋白质已超过当前参考区间；慢病管理目标应由医生或营养师结合个人情况确认。')
     } else if (nutrition.totalCalories > target.calories.max) {
       addUpperLimit('calories', '能量', nutrition.totalCalories, target.calories.max, 'kcal', '已记录能量超过个人参考上限；先核对油、含糖饮料和加餐的份量。')
     }

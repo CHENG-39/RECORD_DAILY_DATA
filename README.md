@@ -33,16 +33,15 @@
 
 Android 包位于 `diet-tracker/android/app/build/outputs/apk/`。将 APK 复制到手机后，允许当前文件管理器“安装未知应用”即可安装。
 
-**正式安装包下载：** [Diet Tracker v1.1.2 for Android](https://cheng-39.github.io/RECORD_DAILY_DATA/downloads/diet-tracker-v1.1.2.apk)
+**正式安装包下载：** [Diet Tracker v1.1.4 for Android](https://cheng-39.github.io/RECORD_DAILY_DATA/downloads/diet-tracker-v1.1.4.apk)
 
-应用启动时会检查 GitHub Pages 上的更新清单。发现新版本后，客户端会展示更新说明、通过 HTTPS 下载 APK、校验 SHA-256，并交由 Android 系统安装页完成更新。系统要求用户确认安装权限，该确认不会被应用绕过。
+应用启动时会检查 GitHub Pages 上的更新清单，也可以在“统计分析 → 应用版本更新”中手动检查。发现新版本后，客户端会在应用私有缓存中下载 APK，并依次校验 SHA-256、applicationId、版本号和签名证书，再交由 Android 系统安装页完成覆盖更新。首次使用需要允许本应用安装未知应用；授权后返回应用会自动继续。系统确认步骤不会被应用绕过。
 
-发布新版本时：
+发布新版本时只需同时提升 `diet-tracker/android/app/build.gradle` 中的 `versionCode` 与 `versionName`，然后将代码推送到 `main`。GitHub Actions 会自动完成正式签名构建、包名/版本/证书校验、更新清单生成、GitHub Release 发布和 Pages 部署；普通网页更新则复用当前版本的 Release，不会覆盖回旧 APK。
 
-1. 提升 Android 的 `versionCode` 与 `versionName`。
-2. 构建并签名 APK，上传到 GitHub Release 或可信 HTTPS 下载地址。
-3. 执行 `npm run android:update-manifest -- <apk路径> <版本号> <版本名> <HTTPS下载地址> "更新说明"` 生成清单。
-4. 部署 `diet-tracker/public/update-manifest.json` 到 GitHub Pages。
+自动发布需要在 GitHub Actions Secrets 中配置 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS` 和 `ANDROID_KEY_PASSWORD`。工作流还会固定核验公开证书指纹，错误密钥无法发布不兼容更新。
+
+已在 D 盘保存签名配置的维护者，可以在使用具备仓库管理权限的 GitHub CLI 登录后运行 `powershell -ExecutionPolicy Bypass -File diet-tracker/scripts/configure-github-release-secrets.ps1`，脚本会直接读取本地密钥并安全写入四项 Secrets，不会打印密码或密钥内容。该步骤只需执行一次。
 
 正式公开分发前，请使用并安全备份专用发布签名密钥。Android 只允许使用同一签名证书的新版覆盖旧版。
 

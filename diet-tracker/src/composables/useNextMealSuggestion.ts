@@ -53,7 +53,7 @@ export function useNextMealSuggestion() {
     if (dietStore.userMode === 'kidney') {
       return [{
         key: 'kidney-record-first',
-        title: '肾脏饮食请以个人方案为准',
+        title: '慢病营养管理请以个人方案为准',
         action: '在录入医生或营养师设定的个人目标前，先如实记录下一餐。',
         reason: '钾、磷、蛋白质和液体限制需要结合分期、化验和治疗方案个体化确定。',
       }]

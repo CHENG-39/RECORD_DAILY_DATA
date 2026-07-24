@@ -20,6 +20,20 @@
         </div>
       </div>
 
+      <div v-if="scenePresets.length" class="scene-presets">
+        <div class="composer-section-title">
+          <span>场景起始组合</span>
+          <small>填入后可继续调整</small>
+        </div>
+        <div class="scene-preset-list">
+          <button v-for="preset in scenePresets" :key="preset.key" type="button" @click="applyScenePreset(preset)">
+            <strong>{{ preset.label }}</strong>
+            <small>{{ preset.description }}</small>
+            <van-icon name="add-o" size="15" />
+          </button>
+        </div>
+      </div>
+
       <div class="composer-drafts">
         <div class="composer-section-title">
           <span>这顿吃了什么</span>
@@ -67,6 +81,18 @@ interface MealDraft {
   weight: number
 }
 
+interface ScenePreset {
+  key: string
+  label: string
+  description: string
+  source: MealSource
+  items: MealDraft[]
+}
+
+type ScenePresetDefinition = Omit<ScenePreset, 'items'> & {
+  queries: Array<{ text: string; weight: number }>
+}
+
 const props = defineProps<{
   modelValue: boolean
   foods: FoodDefinition[]
@@ -91,6 +117,25 @@ const sources: Array<{ value: MealSource; label: string }> = [
   { value: 'convenience', label: '便利店' }, { value: 'mixed', label: '混合' },
 ]
 
+const presetDefinitions: ScenePresetDefinition[] = [
+  {
+    key: 'canteen-balanced', label: '食堂：一饭一菜一蛋白', description: '米饭 + 清淡蔬菜 + 蛋白质', source: 'canteen',
+    queries: [{ text: '米饭', weight: 150 }, { text: '青菜', weight: 150 }, { text: '鸡胸肉（去皮，熟）', weight: 100 }],
+  },
+  {
+    key: 'takeout-simple', label: '外卖：主食配豆腐菜', description: '少汤少酱，份量可调整', source: 'takeout',
+    queries: [{ text: '米饭', weight: 150 }, { text: '北豆腐', weight: 120 }, { text: '青菜', weight: 150 }],
+  },
+  {
+    key: 'home-basic', label: '家常：饭菜加鸡蛋', description: '用现有食材快速起步', source: 'home',
+    queries: [{ text: '米饭', weight: 150 }, { text: '鸡蛋', weight: 50 }, { text: '青菜', weight: 150 }],
+  },
+  {
+    key: 'convenience-basic', label: '便利店：奶类配主食', description: '按包装标签补充实际份量', source: 'convenience',
+    queries: [{ text: '全脂牛奶', weight: 250 }, { text: '馒头', weight: 75 }, { text: '鸡蛋', weight: 50 }],
+  },
+]
+
 watch(() => props.modelValue, opened => {
   if (!opened) return
   searchText.value = ''
@@ -104,6 +149,20 @@ const filteredFoods = computed(() => {
   return (keyword ? props.foods.filter(food => food.name.toLowerCase().includes(keyword)) : props.foods).slice(0, 60)
 })
 
+const scenePresets = computed<ScenePreset[]>(() => presetDefinitions
+  .map(preset => ({
+    key: preset.key,
+    label: preset.label,
+    description: preset.description,
+    source: preset.source,
+    items: preset.queries.flatMap(item => {
+      const food = props.foods.find(candidate => candidate.name.includes(item.text))
+      return food ? [{ food, weight: item.weight }] : []
+    }),
+  }))
+  .filter(preset => preset.items.length >= 2)
+)
+
 const totalCalories = computed(() => Math.round(drafts.value.reduce((total, draft) => total + draft.food.calories * draft.weight / 100, 0)))
 
 function addDraft(food: FoodDefinition): void {
@@ -114,6 +173,15 @@ function addDraft(food: FoodDefinition): void {
 
 function removeDraft(foodId: string): void {
   drafts.value = drafts.value.filter(draft => draft.food.id !== foodId)
+}
+
+function applyScenePreset(preset: ScenePreset): void {
+  source.value = preset.source
+  for (const item of preset.items) {
+    const existing = drafts.value.find(draft => draft.food.id === item.food.id)
+    if (existing) existing.weight += item.weight
+    else drafts.value.push({ ...item })
+  }
 }
 
 function save(): void {
@@ -136,6 +204,14 @@ function save(): void {
 .composer-context > div > span { width: 30px; color: #61716a; font-size: 11px; font-weight: 700; }
 .composer-context button { padding: 5px 8px; color: #64736d; font: inherit; font-size: 11px; background: #f1f5f3; border: 1px solid transparent; border-radius: 5px; }
 .composer-context button.active { color: #fff; background: #237a64; }
+.scene-presets { padding: 12px 16px; background: #f8fbf9; border-bottom: 1px solid #e7ece9; }
+.scene-preset-list { display: flex; gap: 7px; overflow-x: auto; padding-bottom: 1px; scrollbar-width: none; }
+.scene-preset-list::-webkit-scrollbar { display: none; }
+.scene-preset-list button { display: grid; grid-template-columns: minmax(0, 1fr) auto; min-width: 156px; gap: 3px 7px; padding: 9px 10px; color: #31473e; text-align: left; font: inherit; background: #fff; border: 1px solid #dce9e3; border-radius: 7px; }
+.scene-preset-list button:active { background: #edf7f1; border-color: #a9d0bd; }
+.scene-preset-list strong { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.scene-preset-list small { overflow: hidden; color: #81908a; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.scene-preset-list :deep(.van-icon) { grid-row: span 2; align-self: center; color: #237a64; }
 .composer-drafts { max-height: 36%; overflow-y: auto; padding: 13px 16px; background: #fff; }
 .composer-section-title { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 7px; }
 .composer-section-title span { color: #34443e; font-size: 13px; font-weight: 700; }

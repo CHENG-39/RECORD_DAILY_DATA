@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import type { FoodRecord, DailyNutrition, NutritionGoals, UserMode, FoodDefinition, LifestyleProfile, SuggestionFeedback, MealTemplate, PersonalCarePlan, PersonalCarePlanTargets, WeightRecord } from '@/types'
+import type { FoodRecord, DailyNutrition, NutritionGoals, UserMode, FoodDefinition, LifestyleProfile, SuggestionFeedback, MealTemplate, PersonalCarePlan, PersonalCarePlanTargets, WeightRecord, LabReport } from '@/types'
 import { generateId, getTodayString, calculateNutritionTotals, calculateGoalsFromWeight } from '@/utils'
 import { DEFAULT_NUTRITION_GOALS } from '@/constants'
 import { BUILT_IN_FOODS, getPhosphorusBioavailability } from '@/data/foods'
@@ -21,6 +21,7 @@ export const useDietStore = defineStore('diet', () => {
   const customFoods = ref<FoodDefinition[]>([])
   const bodyWeight = ref<number | null>(null) // 用户体重 (kg)
   const weightRecords = ref<WeightRecord[]>([])
+  const labReports = ref<LabReport[]>([])
 
   const allFoods = computed<FoodDefinition[]>(() => {
     return [...BUILT_IN_FOODS, ...customFoods.value]
@@ -172,6 +173,17 @@ export const useDietStore = defineStore('diet', () => {
     weightRecords.value = weightRecords.value.filter(record => record.id !== id)
   }
 
+  function addLabReport(report: Omit<LabReport, 'id'>): LabReport {
+    const newReport = { ...report, id: generateId() }
+    labReports.value = [...labReports.value.filter(item => item.date !== report.date), newReport]
+      .sort((a, b) => a.date.localeCompare(b.date))
+    return newReport
+  }
+
+  function deleteLabReport(id: string): void {
+    labReports.value = labReports.value.filter(report => report.id !== id)
+  }
+
   function addCustomFood(food: Omit<FoodDefinition, 'id' | 'isBuiltIn'>): FoodDefinition {
     const newFood: FoodDefinition = {
       ...food,
@@ -256,6 +268,38 @@ export const useDietStore = defineStore('diet', () => {
       }, []).sort((a, b) => a.date.localeCompare(b.date))
       : []
 
+    labReports.value = Array.isArray(data.labReports)
+      ? data.labReports.reduce<LabReport[]>((result, item) => {
+        if (!item || typeof item !== 'object') return result
+        const raw = item as Record<string, unknown>
+        const date = textValue(raw.date)
+        const sex = raw.sex === 'female' || raw.sex === 'male' ? raw.sex : null
+        const unit = raw.creatinineUnit === 'umol/L' || raw.creatinineUnit === 'mg/dL' ? raw.creatinineUnit : null
+        const age = numberValue(raw.age)
+        const creatinine = numberValue(raw.creatinine)
+        const creatinineMax = unit === 'umol/L' ? 2000 : 25
+        const phosphorusUnit = raw.phosphorusUnit === 'mg/dL' ? 'mg/dL' : 'mmol/L'
+        const potassium = typeof raw.potassium === 'number' && Number.isFinite(raw.potassium) && raw.potassium >= 1 && raw.potassium <= 12
+          ? raw.potassium
+          : undefined
+        const phosphorusMax = phosphorusUnit === 'mg/dL' ? 20 : 6
+        const phosphorus = typeof raw.phosphorus === 'number' && Number.isFinite(raw.phosphorus) && raw.phosphorus > 0 && raw.phosphorus <= phosphorusMax
+          ? raw.phosphorus
+          : undefined
+        if (!textValue(raw.id) || !/^\d{4}-\d{2}-\d{2}$/.test(date) || date > getTodayString() || result.some(report => report.date === date) || !sex || !unit || !Number.isInteger(age) || age < 18 || age > 120 || creatinine < (unit === 'umol/L' ? 20 : 0.2) || creatinine > creatinineMax) return result
+        result.push({
+          id: textValue(raw.id), date, age, sex, creatinine, creatinineUnit: unit,
+          ...(potassium !== undefined ? { potassium } : {}),
+          ...(phosphorus !== undefined ? { phosphorus, phosphorusUnit } : {}),
+          ...(raw.albuminuriaCategory === 'A1' || raw.albuminuriaCategory === 'A2' || raw.albuminuriaCategory === 'A3' || raw.albuminuriaCategory === 'unknown' ? { albuminuriaCategory: raw.albuminuriaCategory } : {}),
+          ...(typeof raw.dialysis === 'boolean' ? { dialysis: raw.dialysis } : {}),
+          ...(textValue(raw.laboratory) ? { laboratory: textValue(raw.laboratory) } : {}),
+          ...(textValue(raw.note) ? { note: textValue(raw.note) } : {}),
+        })
+        return result
+      }, []).sort((a, b) => a.date.localeCompare(b.date))
+      : []
+
     customFoods.value = Array.isArray(data.customFoods)
       ? data.customFoods.reduce<FoodDefinition[]>((result, item) => {
         if (!item || typeof item !== 'object') return result
@@ -322,6 +366,7 @@ export const useDietStore = defineStore('diet', () => {
     personalCarePlan,
     bodyWeight,
     weightRecords,
+    labReports,
     todayRecords,
     todayNutrition,
     addRecord,
@@ -339,6 +384,8 @@ export const useDietStore = defineStore('diet', () => {
     setBodyWeight,
     recordBodyWeight,
     deleteWeightRecord,
+    addLabReport,
+    deleteLabReport,
     customFoods,
     allFoods,
     addCustomFood,

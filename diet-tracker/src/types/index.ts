@@ -51,6 +51,27 @@ export interface WeightRecord {
   weight: number
 }
 
+// ========== 化验报告（仅作趋势与营养讨论参考） ==========
+
+export type LabSex = 'female' | 'male'
+export type CreatinineUnit = 'umol/L' | 'mg/dL'
+
+export interface LabReport {
+  id: string
+  date: string
+  age: number
+  sex: LabSex
+  creatinine: number
+  creatinineUnit: CreatinineUnit
+  potassium?: number
+  phosphorus?: number
+  phosphorusUnit?: 'mmol/L' | 'mg/dL'
+  albuminuriaCategory?: 'A1' | 'A2' | 'A3' | 'unknown'
+  dialysis?: boolean
+  laboratory?: string
+  note?: string
+}
+
 // ========== 自定义食物定义 ==========
 
 export interface FoodDefinition {

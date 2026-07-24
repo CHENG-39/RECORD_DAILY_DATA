@@ -15,7 +15,7 @@
             class="nav-mode-chip"
             :class="{ active: dietStore.userMode === 'kidney' }"
             @click="switchMode('kidney')"
-          >养生</span>
+          >慢病</span>
         </span>
       </span>
     </template>

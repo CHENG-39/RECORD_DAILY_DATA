@@ -107,6 +107,52 @@
         </div>
       </section>
 
+      <section class="lab-report-card" aria-label="化验报告分析">
+        <div class="lab-report-heading">
+          <div>
+            <span>化验报告分析</span>
+            <small>录入肌酐等报告，生成可追溯的参考分析</small>
+          </div>
+          <van-button plain size="small" icon="plus" @click="openLabReportDialog">录入报告</van-button>
+        </div>
+        <template v-if="latestLabAnalysis && latestLabReport">
+          <div class="lab-result-summary">
+            <div>
+              <small>{{ latestLabReport.date }} · 肌酐 {{ latestLabReport.creatinine }} {{ latestLabReport.creatinineUnit }}</small>
+              <small v-if="latestLabReport.albuminuriaCategory && latestLabReport.albuminuriaCategory !== 'unknown'">尿白蛋白 {{ albuminuriaLabel(latestLabReport.albuminuriaCategory) }}</small>
+              <strong>eGFR {{ latestLabAnalysis.egfr ?? '—' }} <small>mL/min/1.73m²</small></strong>
+            </div>
+            <span class="lab-stage" :class="latestLabAnalysis.egfrStage.toLowerCase()">{{ latestLabAnalysis.egfrStage }} 区间</span>
+          </div>
+          <p class="lab-chronicity" :class="latestLabAnalysis.chronicity">
+            {{ latestLabAnalysis.chronicity === 'possible_persistent'
+              ? '相隔至少 90 天的记录中均有 eGFR 或尿白蛋白异常，仍需由医生确认。'
+              : '单次结果不能确认慢性肾病；G1/G2 也必须结合尿白蛋白等肾损伤证据。' }}
+          </p>
+          <div v-if="latestLabAnalysis.alerts.length" class="lab-alerts">
+            <p v-for="alert in latestLabAnalysis.alerts" :key="alert">{{ alert }}</p>
+          </div>
+          <div class="lab-reference-list">
+            <div v-for="item in latestLabAnalysis.nutritionReferences" :key="item.key" class="lab-reference-item">
+              <span>{{ item.label }}</span>
+              <strong>{{ item.value }} {{ item.unit }}</strong>
+              <small class="lab-evidence">依据：{{ item.evidence }}</small>
+              <small>{{ item.explanation }}</small>
+            </div>
+          </div>
+          <p class="lab-disclaimer">结果仅用于整理报告和饮食讨论，不会自动修改营养目标；钾、磷等必须结合原始化验单和医生方案。</p>
+          <details class="lab-limitations">
+            <summary>查看适用限制</summary>
+            <p v-for="item in latestLabAnalysis.limitations" :key="item">{{ item }}</p>
+          </details>
+          <div class="lab-sources">
+            <a v-for="source in labSources" :key="source.url" :href="source.url" target="_blank" rel="noreferrer">{{ source.organization }}：{{ source.title }}</a>
+          </div>
+          <van-button plain size="small" icon="delete-o" @click="removeLatestLabReport">删除此报告</van-button>
+        </template>
+        <van-empty v-else image-size="42" description="暂无化验报告，录入后可查看参考分析" />
+      </section>
+
       <!-- ===== 近7天：可切换趋势柱状图 ===== -->
       <div class="card" v-if="activePeriod === 'week'">
         <h4>近 7 天趋势</h4>
@@ -305,6 +351,13 @@
         </div>
         <input ref="backupInput" class="backup-input" type="file" accept="application/json,.json" @change="handleRestore" />
       </section>
+      <section class="app-maintenance" aria-label="应用更新">
+        <div>
+          <span>应用版本更新</span>
+          <small>{{ nativeUpdateSupported ? '在应用内检查、下载并验证新版，保留现有本地数据' : '请在 Android 安装版中使用应用内更新' }}</small>
+        </div>
+        <van-button plain icon="upgrade" :disabled="!nativeUpdateSupported" @click="requestUpdateCheck">检查更新</van-button>
+      </section>
     </div>
 
     <TabBar />
@@ -314,6 +367,38 @@
         <template #extra>kg</template>
       </van-field>
       <p class="weight-record-hint">同一天重复保存会覆盖当天的体重记录。</p>
+    </van-dialog>
+    <van-dialog v-model:show="showLabReportDialog" title="录入化验报告" show-cancel-button :before-close="beforeLabReportClose">
+      <van-field v-model="labReportDate" type="date" label="日期" />
+      <van-field v-model.number="labReportAge" type="number" label="年龄" placeholder="18-120" :required="true" />
+      <van-cell title="生理性别（用于 eGFR 公式）" center>
+        <template #value>
+          <van-radio-group v-model="labReportSex" direction="horizontal">
+            <van-radio name="female">女</van-radio>
+            <van-radio name="male">男</van-radio>
+          </van-radio-group>
+        </template>
+      </van-cell>
+      <van-field v-model.number="labReportCreatinine" type="number" label="肌酐" placeholder="填写报告数值" :required="true">
+        <template #button>
+          <van-dropdown-menu><van-dropdown-item v-model="labReportUnit" :options="creatinineUnitOptions" /></van-dropdown-menu>
+        </template>
+      </van-field>
+      <van-field v-model.number="labReportPotassium" type="number" label="血钾" placeholder="可选，按报告单位 mmol/L" />
+      <van-field v-model.number="labReportPhosphorus" type="number" label="血磷" placeholder="可选，按报告单位填写">
+        <template #button>
+          <van-dropdown-menu><van-dropdown-item v-model="labReportPhosphorusUnit" :options="phosphorusUnitOptions" /></van-dropdown-menu>
+        </template>
+      </van-field>
+      <van-field label="尿白蛋白分级" :model-value="albuminuriaLabel(labReportAlbuminuriaCategory)" readonly>
+        <template #button>
+          <van-dropdown-menu><van-dropdown-item v-model="labReportAlbuminuriaCategory" :options="albuminuriaOptions" /></van-dropdown-menu>
+        </template>
+      </van-field>
+      <van-cell title="正在透析" center>
+        <template #value><van-switch v-model="labReportDialysis" size="22" /></template>
+      </van-cell>
+      <p class="lab-dialog-hint">请照抄原始化验单的单位和日期。尿白蛋白：A1 &lt;30 mg/g（&lt;3 mg/mmol），A2 30-300 mg/g（3-30 mg/mmol），A3 &gt;300 mg/g（&gt;30 mg/mmol）。系统不会仅凭报告自动设置钾、磷或药物相关目标。</p>
     </van-dialog>
     <van-dialog v-model:show="showEncryptionDialog" title="加密导出" show-cancel-button @confirm="handleEncryptedExport">
       <van-field v-model="backupPassphrase" type="password" label="加密口令" placeholder="至少 8 个字符" :required="true" />
@@ -330,9 +415,12 @@
 import { ref, computed } from 'vue'
 import { useDietStore } from '@/stores/diet'
 import { getTodayString, calculateNutritionTotals, exportRecordsAsJSON, getPersonalizedNutrientRanges } from '@/utils'
+import { analyzeLabReport, LAB_DATA_SOURCES } from '@/utils/labAnalysis'
 import { FOOD_DATABASE_RELEASE } from '@/data/foods'
+import { APP_UPDATE_CHECK_EVENT, supportsNativeAppUpdate } from '@/services/appUpdate'
 import { decryptBackup, downloadEncryptedBackup, encryptBackup, isEncryptedBackup } from '@/utils/secureBackup'
 import type { EncryptedBackupEnvelope } from '@/utils/secureBackup'
+import type { LabReport } from '@/types'
 import NavBar from '@/components/NavBar.vue'
 import TabBar from '@/components/TabBar.vue'
 import dayjs from 'dayjs'
@@ -340,6 +428,7 @@ import { showConfirmDialog, showToast } from 'vant'
 
 const dietStore = useDietStore()
 const { records } = dietStore
+const nativeUpdateSupported = supportsNativeAppUpdate()
 
 const nutrientRanges = computed(() => {
   const w = dietStore.bodyWeight || 60
@@ -349,13 +438,44 @@ const nutrientRanges = computed(() => {
 const activePeriod = ref<'week' | 'month'>('week')
 const backupInput = ref<HTMLInputElement | null>(null)
 const showWeightRecordDialog = ref(false)
+const showLabReportDialog = ref(false)
 const weightRecordDate = ref(getTodayString())
 const weightRecordInput = ref<number | undefined>()
+const labReportDate = ref(getTodayString())
+const labReportAge = ref<number | undefined>()
+const labReportSex = ref<'female' | 'male'>('female')
+const labReportCreatinine = ref<number | undefined>()
+const labReportUnit = ref<'umol/L' | 'mg/dL'>('umol/L')
+const labReportPotassium = ref<number | undefined>()
+const labReportPhosphorus = ref<number | undefined>()
+const labReportPhosphorusUnit = ref<'mmol/L' | 'mg/dL'>('mmol/L')
+const labReportAlbuminuriaCategory = ref<'A1' | 'A2' | 'A3' | 'unknown'>('unknown')
+const labReportDialysis = ref(false)
+const creatinineUnitOptions = [
+  { text: 'μmol/L', value: 'umol/L' },
+  { text: 'mg/dL', value: 'mg/dL' },
+]
+const phosphorusUnitOptions = [
+  { text: 'mmol/L', value: 'mmol/L' },
+  { text: 'mg/dL', value: 'mg/dL' },
+]
+const albuminuriaOptions = [
+  { text: '未检测 / 不清楚', value: 'unknown' },
+  { text: 'A1', value: 'A1' },
+  { text: 'A2', value: 'A2' },
+  { text: 'A3', value: 'A3' },
+]
+const labSources = LAB_DATA_SOURCES
 const showEncryptionDialog = ref(false)
 const showDecryptionDialog = ref(false)
 const backupPassphrase = ref('')
 const restorePassphrase = ref('')
 const pendingEncryptedBackup = ref<EncryptedBackupEnvelope | null>(null)
+
+const latestLabReport = computed(() => [...dietStore.labReports].sort((a, b) => b.date.localeCompare(a.date))[0] ?? null)
+const latestLabAnalysis = computed(() => latestLabReport.value
+  ? analyzeLabReport(latestLabReport.value, dietStore.bodyWeight, dietStore.labReports)
+  : null)
 const periods = [
   { key: 'week' as const, label: '近7天' },
   { key: 'month' as const, label: '近30天' },
@@ -697,6 +817,7 @@ function buildBackupPayload() {
     userMode: dietStore.userMode,
     bodyWeight: dietStore.bodyWeight,
     weightRecords: dietStore.weightRecords,
+    labReports: dietStore.labReports,
     customFoods: dietStore.customFoods,
     lifestyleProfile: dietStore.lifestyleProfile,
     mealTemplates: dietStore.mealTemplates,
@@ -710,6 +831,10 @@ function buildBackupPayload() {
 function handleExport(): void {
   exportRecordsAsJSON(buildBackupPayload())
   showToast({ message: '数据已导出', icon: 'success', duration: 1000 })
+}
+
+function requestUpdateCheck(): void {
+  window.dispatchEvent(new CustomEvent(APP_UPDATE_CHECK_EVENT))
 }
 
 function openEncryptedExport(): void {
@@ -742,6 +867,95 @@ function saveWeightRecord(): void {
   }
   dietStore.recordBodyWeight(weight, weightRecordDate.value)
   showToast({ message: '已保存体重记录', icon: 'success', duration: 1000 })
+}
+
+function isValidPastDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || value > getTodayString()) return false
+  const parsed = new Date(`${value}T00:00:00Z`)
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value
+}
+
+function openLabReportDialog(): void {
+  labReportDate.value = getTodayString()
+  labReportAge.value = undefined
+  labReportSex.value = 'female'
+  labReportCreatinine.value = undefined
+  labReportUnit.value = 'umol/L'
+  labReportPotassium.value = undefined
+  labReportPhosphorus.value = undefined
+  labReportPhosphorusUnit.value = 'mmol/L'
+  labReportAlbuminuriaCategory.value = 'unknown'
+  labReportDialysis.value = false
+  showLabReportDialog.value = true
+}
+
+function saveLabReport(): boolean {
+  const age = labReportAge.value
+  const creatinine = labReportCreatinine.value
+  const potassium = labReportPotassium.value
+  const phosphorus = labReportPhosphorus.value
+  const creatinineMax = labReportUnit.value === 'umol/L' ? 2000 : 25
+  const creatinineMin = labReportUnit.value === 'umol/L' ? 20 : 0.2
+  const optionalNumber = (value: number | undefined): number | undefined =>
+    value === undefined || value === null || value === 0 ? undefined : value
+
+  if (!isValidPastDate(labReportDate.value) || age === undefined || !Number.isInteger(age) || age < 18 || age > 120) {
+    showToast({ message: '请输入有效日期和 18-120 岁年龄', icon: 'fail', duration: 1600 })
+    return false
+  }
+  if (creatinine === undefined || !Number.isFinite(creatinine) || creatinine < creatinineMin || creatinine > creatinineMax) {
+    showToast({ message: `肌酐请输入 ${creatinineMin}-${creatinineMax} ${labReportUnit.value}`, icon: 'fail', duration: 1800 })
+    return false
+  }
+  if (potassium !== undefined && (!Number.isFinite(potassium) || potassium < 1 || potassium > 12)) {
+    showToast({ message: '血钾请输入 1-12 mmol/L，或留空', icon: 'fail', duration: 1600 })
+    return false
+  }
+  if (phosphorus !== undefined && (!Number.isFinite(phosphorus) || phosphorus <= 0 || phosphorus > (labReportPhosphorusUnit.value === 'mg/dL' ? 20 : 6))) {
+    showToast({ message: '血磷数值超出可录入范围，请核对原始化验单单位', icon: 'fail', duration: 1800 })
+    return false
+  }
+
+  const report: Omit<LabReport, 'id'> = {
+    date: labReportDate.value,
+    age,
+    sex: labReportSex.value,
+    creatinine,
+    creatinineUnit: labReportUnit.value,
+    ...(optionalNumber(potassium) !== undefined ? { potassium: optionalNumber(potassium) } : {}),
+    ...(optionalNumber(phosphorus) !== undefined ? { phosphorus: optionalNumber(phosphorus), phosphorusUnit: labReportPhosphorusUnit.value } : {}),
+    albuminuriaCategory: labReportAlbuminuriaCategory.value,
+    dialysis: labReportDialysis.value,
+  }
+  dietStore.addLabReport(report)
+  showToast({ message: '已保存化验报告，可在下方查看参考分析', icon: 'success', duration: 1500 })
+  return true
+}
+
+function beforeLabReportClose(action: 'confirm' | 'cancel' | 'close'): boolean {
+  return action === 'confirm' ? saveLabReport() : true
+}
+
+function albuminuriaLabel(category: LabReport['albuminuriaCategory']): string {
+  const labels = {
+    A1: 'A1（正常至轻度升高）',
+    A2: 'A2（中度升高）',
+    A3: 'A3（重度升高）',
+    unknown: '未检测 / 不清楚',
+  } as const
+  return labels[category ?? 'unknown']
+}
+
+async function removeLatestLabReport(): Promise<void> {
+  const report = latestLabReport.value
+  if (!report) return
+  try {
+    await showConfirmDialog({ title: '删除化验报告', message: '删除后不会影响饮食记录或营养目标。', confirmButtonText: '删除' })
+    dietStore.deleteLabReport(report.id)
+    showToast({ message: '已删除化验报告', icon: 'success', duration: 1000 })
+  } catch {
+    // Dialog cancellation is an expected user action.
+  }
 }
 
 async function removeWeightRecord(id: string): Promise<void> {
@@ -1182,6 +1396,39 @@ async function restoreBackupPayload(backup: unknown): Promise<void> {
 .body-record-list .van-icon { color: #c58b8b; }
 .weight-record-hint { margin: 0; padding: 4px 16px 14px; color: #81908b; font-size: 11px; line-height: 1.5; }
 
+.lab-report-card { margin-bottom: 12px; padding: 13px 14px; background: #fff; border: 1px solid #d9e4df; border-radius: 10px; }
+.lab-report-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.lab-report-heading > div { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.lab-report-heading span { color: #2f4740; font-size: 13px; font-weight: 700; }
+.lab-report-heading small { color: #7d8e87; font-size: 10px; line-height: 1.45; }
+.lab-report-heading :deep(.van-button) { height: 30px; flex: 0 0 auto; color: #2e6e5c; border-color: #b9d9cb; border-radius: 6px; font-size: 11px; }
+.lab-result-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 13px; padding: 12px; background: #f3f8f6; border: 1px solid #dceae4; border-radius: 8px; }
+.lab-result-summary > div { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
+.lab-result-summary small { color: #72837c; font-size: 10px; line-height: 1.4; }
+.lab-result-summary strong { color: #263f37; font-size: 18px; letter-spacing: 0; }
+.lab-result-summary strong small { font-size: 9px; font-weight: 500; }
+.lab-stage { flex: 0 0 auto; padding: 5px 7px; color: #52665e; font-size: 11px; font-weight: 700; background: #fff; border: 1px solid #cadad3; border-radius: 6px; }
+.lab-stage.g3a, .lab-stage.g3b { color: #8a632a; background: #fffaf0; border-color: #ecd7ad; }
+.lab-stage.g4, .lab-stage.g5 { color: #9b4444; background: #fff5f5; border-color: #ebc9c9; }
+.lab-chronicity { margin: 9px 0 0; padding: 8px 9px; color: #687a72; font-size: 11px; line-height: 1.55; background: #f7f9f8; border-left: 3px solid #a9bbb3; }
+.lab-chronicity.possible_persistent { color: #795c31; background: #fffaf1; border-left-color: #cf9a4d; }
+.lab-alerts { display: flex; flex-direction: column; gap: 6px; margin-top: 9px; }
+.lab-alerts p { margin: 0; padding: 8px 9px; color: #895050; font-size: 11px; line-height: 1.5; background: #fff7f7; border: 1px solid #f0dada; border-radius: 6px; }
+.lab-reference-list { display: flex; flex-direction: column; margin-top: 12px; border-top: 1px solid #e8eeeb; }
+.lab-reference-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px; padding: 11px 0; border-bottom: 1px solid #e8eeeb; }
+.lab-reference-item > span { color: #53665e; font-size: 11px; font-weight: 600; }
+.lab-reference-item > strong { color: #2f5045; font-size: 12px; text-align: right; }
+.lab-reference-item > small { grid-column: 1 / -1; color: #788981; font-size: 10px; line-height: 1.5; }
+.lab-reference-item > .lab-evidence { color: #4d7969; }
+.lab-disclaimer { margin: 11px 0 0; color: #687971; font-size: 11px; line-height: 1.55; }
+.lab-limitations { margin: 9px 0; color: #63756d; font-size: 11px; }
+.lab-limitations summary { color: #3f6c5c; cursor: pointer; }
+.lab-limitations p { margin: 6px 0 0; line-height: 1.5; }
+.lab-sources { display: flex; flex-direction: column; gap: 6px; margin: 10px 0 12px; padding: 9px; background: #f7f9f8; border-radius: 6px; }
+.lab-sources a { color: #356f5c; font-size: 10px; line-height: 1.45; overflow-wrap: anywhere; }
+.lab-dialog-hint { margin: 0; padding: 8px 16px 14px; color: #75867f; font-size: 11px; line-height: 1.55; }
+.lab-report-card > :deep(.van-button:last-child) { color: #9a5f5f; border-color: #dfc3c3; border-radius: 6px; }
+
 .backup-tools { margin-top: 12px; padding: 13px 14px; background: #fff; border: 1px solid #e1e8e4; border-radius: 10px; }
 .backup-tools > div:first-child { display: flex; flex-direction: column; gap: 3px; }
 .backup-tools > div:first-child span { color: #34443e; font-size: 13px; font-weight: 700; }
@@ -1189,4 +1436,9 @@ async function restoreBackupPayload(backup: unknown): Promise<void> {
 .backup-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
 .backup-actions :deep(.van-button) { height: 34px; color: #2e6e5c; border-color: #b9d9cb; border-radius: 7px; font-size: 12px; }
 .backup-input { display: none; }
+.app-maintenance { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; padding: 13px 14px; background: #fff; border: 1px solid #e1e8e4; border-radius: 10px; }
+.app-maintenance > div { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.app-maintenance span { color: #34443e; font-size: 13px; font-weight: 700; }
+.app-maintenance small { color: #89958f; font-size: 10px; line-height: 1.45; }
+.app-maintenance :deep(.van-button) { height: 34px; flex: 0 0 auto; color: #2e6e5c; border-color: #b9d9cb; border-radius: 7px; font-size: 12px; }
 </style>

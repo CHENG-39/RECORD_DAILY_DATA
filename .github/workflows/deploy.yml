@@ -1,40 +1,223 @@
-name: Deploy to GitHub Pages
+name: Build, Release and Deploy
 
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: android-release-pages
+  cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
+  release-and-deploy:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: diet-tracker/package-lock.json
 
       - name: Install dependencies
-        run: cd diet-tracker && npm ci
+        working-directory: diet-tracker
+        run: npm ci
 
-      - name: Build
-        run: cd diet-tracker && npm run build
+      - name: Read Android version
+        id: version
+        working-directory: diet-tracker
+        run: node scripts/read-android-version.mjs
 
-      - name: Setup Pages
+      - name: Inspect existing release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION_CODE: ${{ steps.version.outputs.version_code }}
+          VERSION_NAME: ${{ steps.version.outputs.version_name }}
+        run: |
+          set -euo pipefail
+          TAG="v${VERSION_NAME}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            mkdir -p "$RUNNER_TEMP/existing-release"
+            gh release download "$TAG" --dir "$RUNNER_TEMP/existing-release" --pattern update-manifest.json
+            RELEASE_CODE="$(jq -r '.versionCode' "$RUNNER_TEMP/existing-release/update-manifest.json")"
+            RELEASE_NAME="$(jq -r '.versionName' "$RUNNER_TEMP/existing-release/update-manifest.json")"
+            if [[ "$RELEASE_CODE" != "$VERSION_CODE" || "$RELEASE_NAME" != "$VERSION_NAME" ]]; then
+              echo "Release $TAG already exists but its manifest does not match versionCode=$VERSION_CODE." >&2
+              echo "Increase both versionCode and versionName before publishing again." >&2
+              exit 1
+            fi
+            echo "required=false" >> "$GITHUB_OUTPUT"
+            echo "previous_tag=$TAG" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          PREVIOUS_TAG="$(gh release list --limit 1 --json tagName --jq '.[0].tagName // ""')"
+          echo "previous_tag=${PREVIOUS_TAG}" >> "$GITHUB_OUTPUT"
+          if [[ -n "$PREVIOUS_TAG" ]]; then
+            mkdir -p "$RUNNER_TEMP/previous-release"
+            if gh release download "$PREVIOUS_TAG" --dir "$RUNNER_TEMP/previous-release" --pattern update-manifest.json; then
+              PREVIOUS_CODE="$(jq -r '.versionCode' "$RUNNER_TEMP/previous-release/update-manifest.json")"
+              if (( VERSION_CODE <= PREVIOUS_CODE )); then
+                echo "versionCode must increase: current=$VERSION_CODE previous=$PREVIOUS_CODE" >&2
+                exit 1
+              fi
+            fi
+          fi
+          echo "required=true" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Java
+        if: steps.release.outputs.required == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Set up Android SDK
+        if: steps.release.outputs.required == 'true'
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        if: steps.release.outputs.required == 'true'
+        run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Restore release signing key
+        if: steps.release.outputs.required == 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for value in KEYSTORE_BASE64 STORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [[ -z "${!value:-}" ]]; then
+              echo "Required GitHub Actions secret $value is not configured." >&2
+              exit 1
+            fi
+          done
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/diet-tracker-release.jks"
+          {
+            printf 'storeFile=%s\n' "$RUNNER_TEMP/diet-tracker-release.jks"
+            printf 'storePassword=%s\n' "$STORE_PASSWORD"
+            printf 'keyAlias=%s\n' "$KEY_ALIAS"
+            printf 'keyPassword=%s\n' "$KEY_PASSWORD"
+          } > "$RUNNER_TEMP/release-signing.properties"
+          echo "DIET_TRACKER_SIGNING_PROPERTIES=$RUNNER_TEMP/release-signing.properties" >> "$GITHUB_ENV"
+
+      - name: Build signed Android release
+        if: steps.release.outputs.required == 'true'
+        working-directory: diet-tracker
+        run: |
+          npm run cap:sync
+          chmod +x android/gradlew
+          cd android
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Verify Android package identity and signature
+        if: steps.release.outputs.required == 'true'
+        env:
+          VERSION_CODE: ${{ steps.version.outputs.version_code }}
+          VERSION_NAME: ${{ steps.version.outputs.version_name }}
+          EXPECTED_CERT_SHA256: 51a38b6957fa8ed303f19ff297ff27477a70941cf7f8a89724eff1a5064adfbb
+        run: |
+          set -euo pipefail
+          APK="diet-tracker/android/app/build/outputs/apk/release/app-release.apk"
+          BADGING="$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | head -n 1)"
+          [[ "$BADGING" == *"name='com.recorddailydata.diettracker'"* ]]
+          [[ "$BADGING" == *"versionCode='$VERSION_CODE'"* ]]
+          [[ "$BADGING" == *"versionName='$VERSION_NAME'"* ]]
+          CERT_SHA256="$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')"
+          if [[ "$CERT_SHA256" != "$EXPECTED_CERT_SHA256" ]]; then
+            echo "Signing certificate mismatch. Refusing to publish an incompatible update." >&2
+            exit 1
+          fi
+
+      - name: Create update manifest
+        if: steps.release.outputs.required == 'true'
+        id: artifact
+        working-directory: diet-tracker
+        env:
+          VERSION_CODE: ${{ steps.version.outputs.version_code }}
+          VERSION_NAME: ${{ steps.version.outputs.version_name }}
+          PREVIOUS_TAG: ${{ steps.release.outputs.previous_tag }}
+        run: |
+          set -euo pipefail
+          APK_NAME="diet-tracker-v${VERSION_NAME}.apk"
+          mkdir -p "$RUNNER_TEMP/new-release"
+          cp android/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/new-release/$APK_NAME"
+
+          if [[ -n "$PREVIOUS_TAG" && "$PREVIOUS_TAG" != "v${VERSION_NAME}" ]]; then
+            mapfile -t NOTES < <(git log "${PREVIOUS_TAG}..HEAD" --pretty=format:%s --no-merges | head -n 8)
+          else
+            mapfile -t NOTES < <(git log -8 --pretty=format:%s --no-merges)
+          fi
+          if (( ${#NOTES[@]} == 0 )); then NOTES=("体验与稳定性优化"); fi
+
+          node scripts/create-update-manifest.mjs \
+            "$RUNNER_TEMP/new-release/$APK_NAME" \
+            "$VERSION_CODE" \
+            "$VERSION_NAME" \
+            "https://cheng-39.github.io/RECORD_DAILY_DATA/downloads/$APK_NAME" \
+            "${NOTES[@]}"
+          cp public/update-manifest.json "$RUNNER_TEMP/new-release/update-manifest.json"
+
+      - name: Publish GitHub Release
+        if: steps.release.outputs.required == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+          VERSION_NAME: ${{ steps.version.outputs.version_name }}
+        run: |
+          gh release create "$TAG" \
+            "$RUNNER_TEMP/new-release/diet-tracker-v${VERSION_NAME}.apk" \
+            "$RUNNER_TEMP/new-release/update-manifest.json" \
+            --target "${GITHUB_SHA}" \
+            --title "Diet Tracker ${VERSION_NAME}" \
+            --generate-notes
+
+      - name: Build web application
+        working-directory: diet-tracker
+        run: npm run build
+
+      - name: Add released Android update to Pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+          VERSION_NAME: ${{ steps.version.outputs.version_name }}
+        run: |
+          set -euo pipefail
+          rm -rf "$RUNNER_TEMP/pages-release"
+          mkdir -p "$RUNNER_TEMP/pages-release" diet-tracker/dist/downloads
+          gh release download "$TAG" --dir "$RUNNER_TEMP/pages-release" --pattern update-manifest.json --pattern "diet-tracker-v${VERSION_NAME}.apk"
+          cp "$RUNNER_TEMP/pages-release/update-manifest.json" diet-tracker/dist/update-manifest.json
+          cp "$RUNNER_TEMP/pages-release/diet-tracker-v${VERSION_NAME}.apk" diet-tracker/dist/downloads/
+          EXPECTED_SHA256="$(jq -r '.sha256' diet-tracker/dist/update-manifest.json)"
+          ACTUAL_SHA256="$(sha256sum "diet-tracker/dist/downloads/diet-tracker-v${VERSION_NAME}.apk" | cut -d ' ' -f 1)"
+          [[ "$EXPECTED_SHA256" == "$ACTUAL_SHA256" ]]
+
+      - name: Set up Pages
         uses: actions/configure-pages@v4
 
-      - name: Upload artifact
+      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: diet-tracker/dist

@@ -2827,16 +2827,16 @@ export function getFoodsByCategory(category: string): FoodDefinition[] {
 
 /** CKD 钾风险评估（基于每100g钾含量 mg，参考 KDIGO 2024） */
 export function getPotassiumRisk(k: number): { level: string; color: string; note: string } {
-  if (k <= 150) return { level: '低钾', color: '#07c160', note: 'CKD 安全，可常吃' }
-  if (k <= 300) return { level: '中钾', color: '#ff976a', note: 'CKD 适量，建议焯水' }
-  return { level: '高钾', color: '#ee0a24', note: 'CKD 限量，必须焯水或避免' }
+  if (k <= 150) return { level: '低钾', color: '#07c160', note: '慢病管理参考：可常吃' }
+  if (k <= 300) return { level: '中钾', color: '#ff976a', note: '慢病管理参考：适量，建议焯水' }
+  return { level: '高钾', color: '#ee0a24', note: '慢病管理提示：注意份量，必要时咨询专业人员' }
 }
 
 /** CKD 磷风险评估（基于每100g磷含量 mg，参考 KDIGO 2024） */
 export function getPhosphorusRisk(p: number): { level: string; color: string; note: string } {
-  if (p <= 100) return { level: '低磷', color: '#07c160', note: 'CKD 安全' }
-  if (p <= 200) return { level: '中磷', color: '#ff976a', note: 'CKD 适量' }
-  return { level: '高磷', color: '#ee0a24', note: 'CKD 限量，避免加工食品中的添加磷' }
+  if (p <= 100) return { level: '低磷', color: '#07c160', note: '慢病管理参考：优先选择' }
+  if (p <= 200) return { level: '中磷', color: '#ff976a', note: '慢病管理参考：适量' }
+  return { level: '高磷', color: '#ee0a24', note: '慢病管理提示：注意加工食品中的添加磷' }
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -2886,7 +2886,7 @@ export function getPtoProteinRatio(food: { phosphorus: number; protein: number }
 }
 
 export function getPtoProteinLevel(ratio: number): { level: string; color: string; note: string } {
-  if (ratio < 10) return { level: '优选', color: '#07c160', note: '低磷高蛋白，CKD 首选' }
+  if (ratio < 10) return { level: '优选', color: '#07c160', note: '低磷高蛋白，慢病管理优选' }
   if (ratio <= 15) return { level: '适量', color: '#ff976a', note: '适量摄入' }
-  return { level: '慎选', color: '#ee0a24', note: '高磷低蛋白，CKD 尽量避开' }
+  return { level: '慎选', color: '#ee0a24', note: '高磷低蛋白，慢病管理中建议减少' }
 }

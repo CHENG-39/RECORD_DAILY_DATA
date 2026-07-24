@@ -36,6 +36,9 @@ venv/
 *~
 .DS_Store
 Thumbs.db
+test-artifacts/
+diet-tracker/releases/*.apk
+diet-tracker/public/downloads/*.apk
 
 # Logs
 *.log

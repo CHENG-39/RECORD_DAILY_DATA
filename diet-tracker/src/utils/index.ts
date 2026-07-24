@@ -1,5 +1,5 @@
 import dayjs from 'dayjs'
-import type { FoodRecord, DailyNutrition, NutritionStatus, NutritionGoals, FoodDefinition, LifestyleProfile, MealTemplate, PersonalCarePlan, SuggestionFeedback, WeightRecord } from '@/types'
+import type { FoodRecord, DailyNutrition, NutritionStatus, NutritionGoals, FoodDefinition, LifestyleProfile, MealTemplate, PersonalCarePlan, SuggestionFeedback, WeightRecord, LabReport } from '@/types'
 import { RECOMMENDED_NUTRITION } from '@/constants/recommended'
 
 
@@ -389,6 +389,7 @@ export function exportRecordsAsJSON(data: {
   userMode?: 'normal' | 'kidney'
   bodyWeight?: number | null
   weightRecords?: WeightRecord[]
+  labReports?: LabReport[]
   customFoods?: FoodDefinition[]
   lifestyleProfile?: LifestyleProfile
   mealTemplates?: MealTemplate[]
