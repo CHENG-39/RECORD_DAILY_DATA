@@ -1,0 +1,1 @@
+function e(e,t){let n=t/100;return{protein:Number((e.protein*n).toFixed(1)),fat:Number((e.fat*n).toFixed(1)),carbs:Number((e.carbs*n).toFixed(1)),fiber:Number((e.fiber*n).toFixed(1)),potassium:Number((e.potassium*n).toFixed(1)),phosphorus:Number((e.phosphorus*n).toFixed(1)),sodium:Number((e.sodium*n).toFixed(1)),calories:Math.round(e.calories*n)}}export{e as t};

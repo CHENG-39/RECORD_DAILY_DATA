@@ -1,0 +1,13 @@
+{
+  "versionCode": 6,
+  "versionName": "1.1.4",
+  "mandatory": false,
+  "publishedAt": "2026-07-24T09:49:26.312Z",
+  "releaseNotes": [
+    "新增化验报告与可追溯营养参考分析",
+    "完善应用内自动更新、签名校验和下载进度",
+    "优化食堂、外卖和家庭饮食记录体验"
+  ],
+  "apkUrl": "https://cheng-39.github.io/RECORD_DAILY_DATA/downloads/diet-tracker-v1.1.4.apk",
+  "sha256": "b563a899f314fa734c9161cafe72a2d3f1c0120145f8b6cfc240cf0f697f4983"
+}
